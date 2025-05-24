@@ -1,4 +1,4 @@
-package auth
+package golangJwtAuth
 
 import (
 	"encoding/json"
@@ -16,7 +16,7 @@ func (j *JWTAuth) Refresh(r *http.Request, w http.ResponseWriter, refreshId, fp 
 	if err != nil || refreshData.Data == nil {
 		return &AuthResult{
 			Success:    false,
-			StatusCode: http.StatusUnauthorized,
+			StatusCode: http.StatusInternalServerError,
 			Error:      "refresh id invalid",
 		}
 	}
@@ -71,7 +71,7 @@ func (j *JWTAuth) Refresh(r *http.Request, w http.ResponseWriter, refreshId, fp 
 		if err != nil {
 			return &AuthResult{
 				Success:    false,
-				StatusCode: http.StatusInternalServerError,
+				StatusCode: http.StatusUnauthorized,
 				Error:      "failed to marshal refresh data",
 			}
 		}
@@ -82,6 +82,15 @@ func (j *JWTAuth) Refresh(r *http.Request, w http.ResponseWriter, refreshId, fp 
 
 		w.Header().Set("X-New-Refresh-ID", newRefreshId)
 		j.SetCookie(w, j.config.RefreshIdCookieKey, newRefreshId, dateNow.Add(j.config.RefreshIdExpires))
+	}
+
+	exists, err := j.config.CheckUserExists(*refreshData.Data)
+	if err != nil || !exists {
+		return &AuthResult{
+			Success:    false,
+			StatusCode: http.StatusUnauthorized,
+			Error:      "unauthorized",
+		}
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims{

@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	JWTAuth "github.com/pardnio/golang-jwt-auth"
+	golangJwtAuth "github.com/pardnltd-tools/golang-jwt-auth"
 )
 
 func main() {
-	config := &JWTAuth.Config{
+	config := &golangJwtAuth.Config{
 		// 使用 ECDSA 演算法
 		// P***Path: 塞入公鑰與私鑰的路徑
 		// P***: 塞入公鑰與私鑰的內容
@@ -19,7 +19,7 @@ func main() {
 		// PrivateKey: "",
 		// PublicKey:  "",
 		// Redis 設定
-		Redis: JWTAuth.RedisConfig{
+		Redis: golangJwtAuth.RedisConfig{
 			Host:     "localhost",
 			Port:     6379,
 			Password: "0123456789",
@@ -37,12 +37,12 @@ func main() {
 		Domain: "axonews.ai",
 		// 用於 refresh token 時判斷資料庫中會員是否存在來決定是否重簽
 		// 回傳 false 則會取消重簽清除 token
-		CheckUserExists: func(userID string) (bool, error) {
-			return true, nil
+		CheckUserExists: func(userData golangJwtAuth.AuthData) (bool, error) {
+			return userData.ID == "1", nil
 		},
 	}
 
-	auth, err := JWTAuth.New(config)
+	auth, err := golangJwtAuth.New(config)
 	if err != nil {
 		log.Fatal("failed to init:", err)
 	}
@@ -71,7 +71,7 @@ func main() {
 			return
 		}
 
-		user := &JWTAuth.AuthData{
+		user := &golangJwtAuth.AuthData{
 			ID:    "1",
 			Name:  "John",
 			Email: "john@example.com",
@@ -110,7 +110,7 @@ func main() {
 	protected.Use(auth.GinMiddleware())
 	{
 		protected.GET("/user", func(c *gin.Context) {
-			user, _ := JWTAuth.GetAuthDataFromGinContext(c)
+			user, _ := golangJwtAuth.GetAuthDataFromGinContext(c)
 			c.JSON(http.StatusOK, gin.H{"user": user})
 		})
 	}

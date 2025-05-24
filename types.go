@@ -1,4 +1,4 @@
-package auth
+package golangJwtAuth
 
 import (
 	"context"
@@ -14,18 +14,18 @@ type JWTAuth struct {
 }
 
 type Config struct {
-	PrivateKeyPath       string                     `json:"private_key_path"`      // 私鑰檔案路徑
-	PublicKeyPath        string                     `json:"public_key_path"`       // 公鑰檔案路徑
-	PrivateKey           string                     `json:"private_key,omitempty"` // 或直接提供私鑰內容
-	PublicKey            string                     `json:"public_key,omitempty"`  // 或直接提供公鑰內容
-	AccessTokenExpires   time.Duration              `json:"access_token_expires"`
-	RefreshIdExpires     time.Duration              `json:"refresh_id_expires"`
-	IsProd               bool                       `json:"is_prod"`
-	Domain               string                     `json:"domain,omitempty"`
-	Redis                RedisConfig                `json:"redis"`
-	CheckUserExists      func(string) (bool, error) `json:"-"`
-	AccessTokenCoolieKey string                     `json:"access_token_cookie_key"`
-	RefreshIdCookieKey   string                     `json:"refresh_id_cookie_key"`
+	PrivateKeyPath       string                       `json:"private_key_path"`      // 私鑰檔案路徑
+	PublicKeyPath        string                       `json:"public_key_path"`       // 公鑰檔案路徑
+	PrivateKey           string                       `json:"private_key,omitempty"` // 或直接提供私鑰內容
+	PublicKey            string                       `json:"public_key,omitempty"`  // 或直接提供公鑰內容
+	AccessTokenExpires   time.Duration                `json:"access_token_expires"`
+	RefreshIdExpires     time.Duration                `json:"refresh_id_expires"`
+	IsProd               bool                         `json:"is_prod"`
+	Domain               string                       `json:"domain,omitempty"`
+	Redis                RedisConfig                  `json:"redis"`
+	CheckUserExists      func(AuthData) (bool, error) `json:"-"`
+	AccessTokenCoolieKey string                       `json:"access_token_cookie_key"`
+	RefreshIdCookieKey   string                       `json:"refresh_id_cookie_key"`
 }
 
 type RedisConfig struct {
@@ -62,5 +62,5 @@ type AuthResult struct {
 
 type TokenResult struct {
 	Token     string `json:"token"`
-	RefreshID string `json:"refresh_id"`
+	RefreshId string `json:"refresh_id"`
 }

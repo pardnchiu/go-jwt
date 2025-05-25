@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	golangJwtAuth "github.com/pardnltd-tools/golang-jwt-auth"
+	golangJwtAuth "github.com/pardnchiu/golang-jwt-auth"
 )
 
 func main() {
@@ -26,7 +26,7 @@ func main() {
 			DB:       0,
 		},
 		// 自訂 Cookie 欄位名稱
-		AccessTokenCoolieKey: "access_token",
+		AccessTokenCookieKey: "access_token",
 		RefreshIdCookieKey:   "refresh_id",
 		// 自訂 Token 失效時間
 		AccessTokenExpires: 1 * time.Minute,

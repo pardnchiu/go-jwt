@@ -9,7 +9,7 @@ func (j *JWTAuth) Revoke(r *http.Request, w http.ResponseWriter) error {
 	refreshId := j.GetRefreshId(r)
 	accessToken := j.GetAccessToken(r)
 
-	j.ClearCookie(w, j.config.AccessTokenCoolieKey)
+	j.ClearCookie(w, j.config.AccessTokenCookieKey)
 	j.ClearCookie(w, j.config.RefreshIdCookieKey)
 
 	if refreshId != "" {

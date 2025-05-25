@@ -63,10 +63,10 @@ func (j *JWTAuth) Refresh(r *http.Request, w http.ResponseWriter, refreshId, fp 
 	// version > 5
 	// ttl < j.config.RefreshIdExpires / 2
 	if refreshData.Version > 5 || ttl < j.config.RefreshIdExpires/2 {
-		j.redisClient.SetEx(j.context, "refresh:"+refreshId, string(newRefreshDataJson), 30*time.Second)
+		j.redisClient.SetEx(j.context, "refresh:"+refreshId, string(newRefreshDataJson), 5*time.Second)
 		newRefreshId := j.CreateRefreshId(refreshData.Data.ID, refreshData.Data.Name, refreshData.Data.Email, fp)
 
-		newRefreshData["version"] = 1
+		newRefreshData["version"] = 0
 		newRefreshDataJson, err := json.Marshal(newRefreshData)
 		if err != nil {
 			return &AuthResult{
@@ -76,7 +76,7 @@ func (j *JWTAuth) Refresh(r *http.Request, w http.ResponseWriter, refreshId, fp 
 			}
 		}
 
-		if err := j.redisClient.SetEx(j.context, "refresh:"+refreshId, string(newRefreshDataJson), ttl).Err(); err != nil {
+		if err := j.redisClient.SetEx(j.context, "refresh:"+newRefreshId, string(newRefreshDataJson), ttl).Err(); err != nil {
 			fmt.Printf("failed to save new refresh data: %v", err)
 		}
 
@@ -126,7 +126,7 @@ func (j *JWTAuth) Refresh(r *http.Request, w http.ResponseWriter, refreshId, fp 
 	}
 
 	w.Header().Set("X-New-Access-Token", newAccessToken)
-	j.SetCookie(w, j.config.AccessTokenCoolieKey, newAccessToken, dateNow.Add(j.config.AccessTokenExpires))
+	j.SetCookie(w, j.config.AccessTokenCookieKey, newAccessToken, dateNow.Add(j.config.AccessTokenExpires))
 
 	return &AuthResult{
 		Success:    true,

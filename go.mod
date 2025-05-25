@@ -1,4 +1,4 @@
-module github.com/pardnltd-tools/golang-jwt-auth
+module github.com/pardnchiu/golang-jwt-auth
 
 go 1.24.3
 

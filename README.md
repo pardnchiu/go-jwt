@@ -1,56 +1,101 @@
-# JWT Auth Golang Package
+# JWT Auth (Golang)
 
-A Go JWT authentication package providing both Access Token and Refresh Token mechanisms, featuring fingerprint recognition, Redis storage, and automatic refresh functionality.
+> A JWT authentication package providing both Access Token and Refresh Token mechanisms, featuring fingerprint recognition, Redis storage, and automatic refresh functionality.<br>
+> version Node.js can get [here](https://github.com/pardnchiu/nodejs-jwt-auth)
+
+[![version](https://img.shields.io/github/v/tag/pardnchiu/golang-jwt-auth)](https://github.com/pardnchiu/golang-jwt-auth)
+
+## Feature
+
+- ### Dual Token System
+  - Access Token (short-term) + Refresh Token (long-term)
+  - Automatic token refresh without requiring re-login
+  - ES256 algorithm (Elliptic Curve Digital Signature)
+- ### Device Fingerprinting
+  - Generates unique fingerprints based on User-Agent, Device ID, OS, and Browser
+  - Prevents token misuse across different devices
+  - Automatic device type detection (Desktop, Mobile, Tablet)
+- ### Token Revocation
+  - Adds Access Token to blacklist upon logout
+  - Redis TTL automatically cleans expired revocation records
+  - Prevents reuse of logged-out tokens
+- ### Version Control Protection
+  - Refresh Token version tracking
+  - Auto-generates new Refresh ID after 5 refresh attempts
+  - Prevents replay attacks
+- ### Smart Refresh Strategy
+  - Auto-regenerates when Refresh Token has less than half lifetime remaining
+  - 5-second grace period for old tokens to reduce concurrency issues
+  - Minimizes database queries
+- ### Multiple Authentication Methods
+  - Automatic cookie reading
+  - Authorization Bearer Header
+  - Custom Headers (X-Device-ID, X-Refresh-ID)
+- ### Flexible Configuration
+  - Supports file paths or direct key content
+  - Customizable Cookie names
+  - Production/Development environment auto-switching
 
 ## How to use
 
-### New()
+- ### Installation
+  ```bash
+  go get github.com/pardnchiu/golang-jwt-auth
+  ```
+- ### Initialize
+  ```go
+  package main
 
-```go
-package main
+  import (
+    "log"
+    "time"
 
-import (
-  "log"
-  "time"
-  "github.com/pardnltd-tools/golang-jwt-auth"
-)
+    "github.com/pardnchiu/golang-jwt-auth"
+  )
 
-func main() {
-  config := &golangJwtAuth.Config{
-    PrivateKeyPath:       "./keys/private.pem",
-    PublicKeyPath:        "./keys/public.pem", 
-    AccessTokenExpires:   15 * time.Minute,
-    RefreshIdExpires:     7 * 24 * time.Hour,
-    IsProd:               false,
-    Domain:               "localhost",
-    AccessTokenCoolieKey: "access_token",
-    RefreshIdCookieKey:   "refresh_id",
-    Redis: golangJwtAuth.RedisConfig{
-      Host:     "localhost",
-      Port:     6379,
-      Password: "",
-      DB:       0,
-    },
-    CheckUserExists: func(user golangJwtAuth.AuthData) (bool, error) {
-      // Implement user existence check logic
-      return true, nil
-    },
+  func main() {
+    config := &golangJwtAuth.Config{
+      PrivateKeyPath:       "./keys/private.pem",
+      PublicKeyPath:        "./keys/public.pem", 
+      // Or provide keys directly:
+      // PrivateKey:           "-----BEGIN EC PRIVATE KEY-----...",
+      // PublicKey:            "-----BEGIN PUBLIC KEY-----...",
+      AccessTokenExpires:   15 * time.Minute,
+      RefreshIdExpires:     7 * 24 * time.Hour,
+      // true: domain=Domain, samesite=none, secure=true
+      // false: domain=localhost, samesite=lax, secure=false
+      IsProd:               false,
+      Domain:               "pardn.io",
+      // cookie key, default access_token/refresh_id
+      AccessTokenCookieKey: "access_token",
+      RefreshIdCookieKey:   "refresh_id",
+      // store with redis
+      Redis: golangJwtAuth.RedisConfig{
+        Host:     "localhost",
+        Port:     6379,
+        Password: "",
+        DB:       0,
+      },
+      CheckUserExists: func(user golangJwtAuth.AuthData) (bool, error) {
+      // return true if user exists, false otherwise
+        return true, nil
+      },
+    }
+
+    jwtAuth, err := golangJwtAuth.New(config)
+    if err != nil {
+      log.Fatal("failed to init:", err)
+    }
+    defer jwtAuth.Close()
   }
-
-  jwtAuth, err := golangJwtAuth.New(config)
-  if err != nil {
-    log.Fatal("failed to init:", err)
-  }
-  defer jwtAuth.Close()
-}
-```
+  ```
 
 ### Create()
 
 ```go
 func loginHandler(jwtAuth *golangJwtAuth.JWTAuth) http.HandlerFunc {
   return func(w http.ResponseWriter, r *http.Request) {
-    // After verifying user login info...
+    // after verifying user login info...
     
     userData := &golangJwtAuth.AuthData{
       ID:        "user123",
@@ -68,7 +113,7 @@ func loginHandler(jwtAuth *golangJwtAuth.JWTAuth) http.HandlerFunc {
       return
     }
 
-    // Token is automatically set in the cookie, and can also be returned to the frontend
+    // automatically set in cookies
     json.NewEncoder(w).Encode(map[string]interface{}{
       "success":    true,
       "token":      tokenResult.Token,
@@ -128,7 +173,7 @@ package main
 
 import (
   "github.com/gin-gonic/gin"
-  "github.com/pardnltd-tools/golang-jwt-auth"
+  "github.com/pardnchiu/golang-jwt-auth"
 )
 
 func main() {
@@ -168,7 +213,7 @@ package main
 
 import (
   "net/http"
-  "github.com/pardnltd-tools/golang-jwt-auth"
+  "github.com/pardnchiu/golang-jwt-auth"
 )
 
 func main() {
@@ -202,18 +247,23 @@ func main() {
 
 ## Configuration
 
-### Config struct parameters
+### Config
+- `PrivateKeyPath` / `PrivateKey`: private key file path or content
+- `PublicKeyPath` / `PublicKey`: public key file path or content  
+- `AccessTokenExpires`: access token expire time
+- `RefreshIdExpires`: refresh id expire time
+- `IsProd`: is production or not (affects cookie setting)
+- `Domain`: cookie domain
+- `Redis`: redis connection
+  - `Host`: redis host
+  - `Port`: redis port
+  - `Password`: redis password (optional)
+  - `Db`: redis db (optional)
+- `CheckUserExists`: user existence check function
+- `AccessTokenCookieKey`: access token cookie name (default: 'access_token')
+- `RefreshTokenCookieKey`: refresh id cookie name (default: 'refresh_id')
 
-- `PrivateKeyPath` / `PrivateKey`: EC private key file path or content
-- `PublicKeyPath` / `PublicKey`: EC public key file path or content  
-- `AccessTokenExpires`: Access Token expiration duration
-- `RefreshIdExpires`: Refresh Token expiration duration
-- `IsProd`: Whether in production environment (affects cookie security settings)
-- `Domain`: Cookie domain setting
-- `Redis`: Redis connection settings
-- `CheckUserExists`: User existence check function
-
-### Supported authentication methods
+### Supported methods
 
 1. **Cookie**: Automatically reads token from cookie
 2. **Authorization Header**: `Authorization: Bearer <token>`
@@ -222,23 +272,24 @@ func main() {
    - `X-Refresh-ID`: Custom Refresh ID
    - `X-Device-ID`: Device ID
 
-## Token refresh mechanism
+## Token refresh
 
 The system automatically generates a new Refresh ID in the following cases:
 - Refresh version exceeds 5 times
 - Remaining Refresh Token time is less than half
 
-The new Refresh ID is returned via:
-- HTTP Header: `X-New-Refresh-ID`
+The new tokens are returned via:
 - HTTP Header: `X-New-Access-Token`
+- HTTP Header: `X-New-Refresh-ID`
 - Cookie auto-update
 
 ## Security features
 
-- **Fingerprint recognition**: Generates a unique fingerprint based on User-Agent, Device-ID, OS, and Browser
+- **Fingerprint recognition**: Generates a unique fingerprint based on User-Agent, Device-ID, OS, Browser, and Device type
 - **Token revocation**: Adds token to a blacklist on logout
 - **Automatic expiration**: Supports TTL to automatically clean up expired tokens
 - **Version control**: Tracks Refresh Token versions to prevent replay attacks
+- **Fingerprint validation**: Ensures tokens are used from the same device/browser
 
 ## Error handling
 
@@ -254,10 +305,3 @@ Common error types:
 - `fingerprint invalid`: Fingerprint mismatch
 - `refresh id invalid`: Invalid Refresh ID
 - `access token invalid`: Invalid Access Token
-
-## Notes
-
-1. Ensure Redis service is running properly
-2. Set up EC key pairs correctly
-3. Set correct domain and HTTPS in production
-4. Implement the `CheckUserExists` function to verify user status

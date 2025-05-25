@@ -24,7 +24,7 @@ type Config struct {
 	Domain               string                       `json:"domain,omitempty"`
 	Redis                RedisConfig                  `json:"redis"`
 	CheckUserExists      func(AuthData) (bool, error) `json:"-"`
-	AccessTokenCoolieKey string                       `json:"access_token_cookie_key"`
+	AccessTokenCookieKey string                       `json:"access_token_cookie_key"`
 	RefreshIdCookieKey   string                       `json:"refresh_id_cookie_key"`
 }
 

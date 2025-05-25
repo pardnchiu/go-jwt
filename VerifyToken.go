@@ -115,7 +115,7 @@ func (j *JWTAuth) Verify(r *http.Request, w http.ResponseWriter) *AuthResult {
 }
 
 func (j *JWTAuth) GetAccessToken(r *http.Request) string {
-	if cookie, err := r.Cookie(j.config.AccessTokenCoolieKey); err == nil {
+	if cookie, err := r.Cookie(j.config.AccessTokenCookieKey); err == nil {
 		return cookie.Value
 	}
 

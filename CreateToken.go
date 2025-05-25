@@ -43,7 +43,7 @@ func (j *JWTAuth) Create(r *http.Request, w http.ResponseWriter, u *AuthData) (*
 		return nil, fmt.Errorf("failed to sign token: %v", err)
 	}
 
-	j.SetCookie(w, j.config.AccessTokenCoolieKey, accessToken, dateNow.Add(j.config.AccessTokenExpires))
+	j.SetCookie(w, j.config.AccessTokenCookieKey, accessToken, dateNow.Add(j.config.AccessTokenExpires))
 	j.SetCookie(w, j.config.RefreshIdCookieKey, refreshId, dateNow.Add(j.config.RefreshIdExpires))
 
 	refreshData, _ := json.Marshal(map[string]interface{}{

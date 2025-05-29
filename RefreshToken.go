@@ -17,7 +17,7 @@ func (j *JWTAuth) Refresh(r *http.Request, w http.ResponseWriter, refreshId, fp 
 	if err != nil || refreshData.Data == nil {
 		return &AuthResult{
 			Success:    false,
-			StatusCode: http.StatusInternalServerError,
+			StatusCode: http.StatusUnauthorized,
 			Error:      "refresh id invalid",
 		}
 	}
@@ -75,7 +75,12 @@ func (j *JWTAuth) Refresh(r *http.Request, w http.ResponseWriter, refreshId, fp 
 	ttl, err := j.redisClient.TTL(j.context, "refresh:"+refreshId).Result()
 	if err == nil && ttl > 0 {
 		if err := j.redisClient.SetEx(j.context, "refresh:"+refreshId, string(newRefreshDataJson), ttl).Err(); err != nil {
-			fmt.Printf("failed to save to redis: %v", err)
+			fmt.Printf("failed to save new refresh data: %v", err)
+			return &AuthResult{
+				Success:    false,
+				StatusCode: http.StatusInternalServerError,
+				Error:      "failed to save new refresh data",
+			}
 		}
 	} else {
 		return &AuthResult{
@@ -94,13 +99,18 @@ func (j *JWTAuth) Refresh(r *http.Request, w http.ResponseWriter, refreshId, fp 
 		if err != nil {
 			return &AuthResult{
 				Success:    false,
-				StatusCode: http.StatusUnauthorized,
+				StatusCode: http.StatusInternalServerError,
 				Error:      "failed to marshal refresh data",
 			}
 		}
 
 		if err := j.redisClient.SetEx(j.context, "refresh:"+newRefreshId, string(newRefreshDataJson), ttl).Err(); err != nil {
 			fmt.Printf("failed to save new refresh data: %v", err)
+			return &AuthResult{
+				Success:    false,
+				StatusCode: http.StatusInternalServerError,
+				Error:      "failed to save new refresh data",
+			}
 		}
 
 		w.Header().Set("X-New-Refresh-ID", newRefreshId)
@@ -153,7 +163,12 @@ func (j *JWTAuth) Refresh(r *http.Request, w http.ResponseWriter, refreshId, fp 
 	}
 
 	if err := j.redisClient.SetEx(j.context, "jti:"+newJTI, "1", j.config.AccessTokenExpires).Err(); err != nil {
-		fmt.Printf("failed to save to redis: %v", err)
+		fmt.Printf("failed to store JTI in redis: %v", err)
+		return &AuthResult{
+			Success:    false,
+			StatusCode: http.StatusInternalServerError,
+			Error:      "failed to store JTI in redis",
+		}
 	}
 
 	w.Header().Set("X-New-Access-Token", newAccessToken)

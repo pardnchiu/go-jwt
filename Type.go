@@ -14,20 +14,20 @@ type JWTAuth struct {
 }
 
 type Config struct {
-	PrivateKeyPath       string                       `json:"private_key_path"`      // 私鑰檔案路徑
-	PublicKeyPath        string                       `json:"public_key_path"`       // 公鑰檔案路徑
-	PrivateKey           string                       `json:"private_key,omitempty"` // 或直接提供私鑰內容
-	PublicKey            string                       `json:"public_key,omitempty"`  // 或直接提供公鑰內容
-	AccessTokenExpires   time.Duration                `json:"access_token_expires"`
-	RefreshIdExpires     time.Duration                `json:"refresh_id_expires"`
-	IsProd               bool                         `json:"is_prod"`
-	Domain               string                       `json:"domain,omitempty"`
+	PrivateKeyPath       string                       `json:"private_key_path"`               // Path to private key file
+	PublicKeyPath        string                       `json:"public_key_path"`                // Path to public key file
+	PrivateKey           string                       `json:"private_key,omitempty"`          // Or directly provide private key content
+	PublicKey            string                       `json:"public_key,omitempty"`           // Or directly provide public key content
+	AccessTokenExpires   time.Duration                `json:"access_token_expires,omitempty"` // Default 15 minutes
+	RefreshIdExpires     time.Duration                `json:"refresh_id_expires,omitempty"`   // Default 7 days
+	IsProd               bool                         `json:"is_prod"`                        // Default false
+	Domain               string                       `json:"domain,omitempty"`               // Default localhost
 	Redis                RedisConfig                  `json:"redis"`
 	CheckUserExists      func(AuthData) (bool, error) `json:"-"`
-	AccessTokenCookieKey string                       `json:"access_token_cookie_key"`
-	RefreshIdCookieKey   string                       `json:"refresh_id_cookie_key"`
-	MaxVersion           int                          `json:"max_version"` // 版本閾值，預設 5
-	RefreshTTL           float64                      `json:"refresh_ttl"` // TTL 閾值，預設 0.5
+	AccessTokenCookieKey string                       `json:"access_token_cookie_key,omitempty"` // Default access_token
+	RefreshIdCookieKey   string                       `json:"refresh_id_cookie_key,omitempty"`   // Default refresh_id
+	MaxVersion           int                          `json:"max_version,omitempty"`             // Version threshold, default 5
+	RefreshTTL           float64                      `json:"refresh_ttl,omitempty"`             // TTL threshold, default 0.5
 }
 
 type RedisConfig struct {

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -44,6 +45,34 @@ func New(config *Config) (*JWTAuth, error) {
 		config.PublicKey = string(publicKeyBytes)
 	} else if config.PublicKey == "" {
 		return nil, fmt.Errorf("public key is required")
+	}
+
+	if config.AccessTokenExpires == 0 {
+		config.AccessTokenExpires = 15 * time.Minute
+	}
+
+	if config.RefreshIdExpires == 0 {
+		config.RefreshIdExpires = 7 * 24 * time.Hour
+	}
+
+	if config.Domain == "" {
+		config.Domain = "localhost"
+	}
+
+	if config.AccessTokenCookieKey == "" {
+		config.AccessTokenCookieKey = "access_token"
+	}
+
+	if config.RefreshIdCookieKey == "" {
+		config.RefreshIdCookieKey = "refresh_id"
+	}
+
+	if config.MaxVersion == 0 {
+		config.MaxVersion = 5
+	}
+
+	if config.RefreshTTL == 0 {
+		config.RefreshTTL = 0.5
 	}
 
 	return &JWTAuth{

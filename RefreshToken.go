@@ -84,18 +84,8 @@ func (j *JWTAuth) Refresh(r *http.Request, w http.ResponseWriter, refreshId, fp 
 			Error:      "refresh token invalid",
 		}
 	}
-	// 使用可配置的參數（避免硬編碼）
-	maxVersion := j.config.MaxVersion
-	if maxVersion == 0 {
-		maxVersion = 5
-	}
 
-	ttlThreshold := j.config.RefreshTTL
-	if ttlThreshold == 0 {
-		ttlThreshold = 0.5
-	}
-
-	if refreshData.Version > maxVersion || ttl < time.Duration(float64(j.config.RefreshIdExpires)*ttlThreshold) {
+	if refreshData.Version > j.config.MaxVersion || ttl < time.Duration(float64(j.config.RefreshIdExpires)*j.config.RefreshTTL) {
 		j.redisClient.SetEx(j.context, "refresh:"+refreshId, string(newRefreshDataJson), 5*time.Second)
 		newRefreshId := j.CreateRefreshId(refreshData.Data.ID, refreshData.Data.Name, refreshData.Data.Email, fp)
 
@@ -117,12 +107,14 @@ func (j *JWTAuth) Refresh(r *http.Request, w http.ResponseWriter, refreshId, fp 
 		j.SetCookie(w, j.config.RefreshIdCookieKey, newRefreshId, dateNow.Add(j.config.RefreshIdExpires))
 	}
 
-	exists, err := j.config.CheckUserExists(*refreshData.Data)
-	if err != nil || !exists {
-		return &AuthResult{
-			Success:    false,
-			StatusCode: http.StatusUnauthorized,
-			Error:      "unauthorized",
+	if j.config.CheckUserExists != nil {
+		exists, err := j.config.CheckUserExists(*refreshData.Data)
+		if err != nil || !exists {
+			return &AuthResult{
+				Success:    false,
+				StatusCode: http.StatusUnauthorized,
+				Error:      "unauthorized",
+			}
 		}
 	}
 

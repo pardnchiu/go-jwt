@@ -66,10 +66,10 @@
       // false: domain=localhost, samesite=lax, secure=false
       IsProd:               false,
       Domain:               "pardn.io",
-      // cookie key, default access_token/refresh_id
+      // Cookie key names, defaults to access_token/refresh_id
       AccessTokenCookieKey: "access_token",
       RefreshIdCookieKey:   "refresh_id",
-      // store with redis
+      // Redis storage configuration
       Redis: golangJwtAuth.RedisConfig{
         Host:     "localhost",
         Port:     6379,
@@ -77,9 +77,13 @@
         DB:       0,
       },
       CheckUserExists: func(user golangJwtAuth.AuthData) (bool, error) {
-      // return true if user exists, false otherwise
+        // Return true if user exists, false otherwise
         return true, nil
       },
+      // Maximum version threshold, default 5
+      MaxVersion: 5,
+      // TTL threshold, default 0.5
+      RefreshTTL: 0.5
     }
 
     jwtAuth, err := golangJwtAuth.New(config)

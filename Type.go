@@ -26,6 +26,8 @@ type Config struct {
 	CheckUserExists      func(AuthData) (bool, error) `json:"-"`
 	AccessTokenCookieKey string                       `json:"access_token_cookie_key"`
 	RefreshIdCookieKey   string                       `json:"refresh_id_cookie_key"`
+	MaxVersion           int                          `json:"max_version"` // 版本閾值，預設 5
+	RefreshTTL           float64                      `json:"refresh_ttl"` // TTL 閾值，預設 0.5
 }
 
 type RedisConfig struct {
@@ -51,6 +53,7 @@ type RefreshData struct {
 	Fingerprint string    `json:"fp"`
 	EXP         int64     `json:"exp"`
 	IAT         int64     `json:"iat"`
+	JTI         string    `json:"jti"`
 }
 
 type AuthResult struct {

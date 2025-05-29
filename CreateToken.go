@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 )
 
 func (j *JWTAuth) Create(r *http.Request, w http.ResponseWriter, u *AuthData) (*TokenResult, error) {
@@ -19,6 +20,9 @@ func (j *JWTAuth) Create(r *http.Request, w http.ResponseWriter, u *AuthData) (*
 	fp := j.GetFingerprint(r)
 	dateNow := time.Now()
 	refreshId := j.CreateRefreshId(u.ID, u.Name, u.Email, fp)
+
+	jwtID := uuid.New().String()
+
 	claims := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims{
 		"id":         u.ID,
 		"name":       u.Name,
@@ -28,9 +32,11 @@ func (j *JWTAuth) Create(r *http.Request, w http.ResponseWriter, u *AuthData) (*
 		"role":       u.Role,
 		"level":      u.Level,
 		"fp":         fp,
+		"jti":        jwtID,
 		"refresh_id": refreshId,
 		"exp":        dateNow.Add(j.config.AccessTokenExpires).Unix(),
 		"iat":        dateNow.Unix(),
+		"nbf":        dateNow.Unix(),
 	})
 
 	privateKey, err := jwt.ParseECPrivateKeyFromPEM([]byte(j.config.PrivateKey))
@@ -60,8 +66,14 @@ func (j *JWTAuth) Create(r *http.Request, w http.ResponseWriter, u *AuthData) (*
 		"fp":      fp,
 		"exp":     dateNow.Add(j.config.AccessTokenExpires).Unix(),
 		"iat":     dateNow.Unix(),
+		"jti":     jwtID,
 	})
-	if err := j.redisClient.SetEx(j.context, "refresh:"+refreshId, string(refreshData), j.config.RefreshIdExpires).Err(); err != nil {
+
+	pipe := j.redisClient.TxPipeline()
+	pipe.SetEx(j.context, "refresh:"+refreshId, string(refreshData), j.config.RefreshIdExpires)
+	pipe.SetEx(j.context, "jti:"+jwtID, "1", j.config.AccessTokenExpires)
+	_, err = pipe.Exec(j.context)
+	if err != nil {
 		return nil, fmt.Errorf("failed to save to redis: %v", err)
 	}
 

@@ -6,6 +6,7 @@ import (
 	"net/http"
 )
 
+// * private method
 func getStr(data map[string]interface{}, key string) string {
 	v, exists := data[key]
 	if !exists || v == nil {
@@ -26,6 +27,7 @@ func getStr(data map[string]interface{}, key string) string {
 	}
 }
 
+// * private method
 func getInt(data map[string]interface{}, key string) int {
 	v, exists := data[key]
 	if !exists || v == nil {
@@ -44,6 +46,7 @@ func getInt(data map[string]interface{}, key string) int {
 	}
 }
 
+// * private method
 func getScope(data map[string]interface{}, key string) []string {
 	v, exists := data[key]
 	if !exists || v == nil {
@@ -66,18 +69,20 @@ func getScope(data map[string]interface{}, key string) []string {
 	}
 }
 
-func (j *JWTAuth) GetRefreshId(r *http.Request) string {
+// * private method
+func (j *JWTAuth) getRefreshId(r *http.Request) string {
 	if refreshId := r.Header.Get("X-Refresh-ID"); refreshId != "" {
 		return refreshId
 	}
-	if cookie, err := r.Cookie(j.config.RefreshIdCookieKey); err == nil {
+	if cookie, err := r.Cookie(j.Config.RefreshIdCookieKey); err == nil {
 		return cookie.Value
 	}
 	return ""
 }
 
-func (j *JWTAuth) GetRefreshData(refreshId, fp string) (*RefreshData, error) {
-	refreshDataJson, err := j.redisClient.Get(j.context, "refresh:"+refreshId).Result()
+// * private method
+func (j *JWTAuth) getRefreshData(refreshId, fp string) (*RefreshData, error) {
+	refreshDataJson, err := j.Redis.Get(j.Context, "refresh:"+refreshId).Result()
 	if err != nil {
 		return nil, err
 	}
@@ -95,8 +100,8 @@ func (j *JWTAuth) GetRefreshData(refreshId, fp string) (*RefreshData, error) {
 	return &refreshData, nil
 }
 
-// set user data from json and return AuthData
-func (j *JWTAuth) GetUserData(data map[string]interface{}) AuthData {
+// * private method
+func (j *JWTAuth) getUserData(data map[string]interface{}) AuthData {
 	return AuthData{
 		ID:        getStr(data, "id"),
 		Name:      getStr(data, "name"),

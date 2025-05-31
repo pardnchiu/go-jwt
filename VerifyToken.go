@@ -10,113 +10,140 @@ import (
 )
 
 func (j *JWTAuth) Verify(r *http.Request, w http.ResponseWriter) *AuthResult {
-	fp := j.GetFingerprint(r)
-	accessToken := j.GetAccessToken(r)
-	refreshId := j.GetRefreshId(r)
+	fp := j.getFingerprint(r)
+	accessToken := j.getAccessToken(r)
+	refreshId := j.getRefreshId(r)
 
 	if accessToken == "" && refreshId == "" {
 		return &AuthResult{
 			Success:    false,
 			StatusCode: http.StatusUnauthorized,
-			Error:      "unauthorized",
+			Error:      "Unauthorized",
 		}
 	}
 
 	if accessToken == "" && refreshId != "" {
-		if _, err := j.GetRefreshData(refreshId, fp); err != nil {
+		if _, err := j.getRefreshData(refreshId, fp); err != nil {
+			j.Logger.Refresh(true,
+				"Refresh ID is required",
+				err.Error(),
+			)
 			return &AuthResult{
 				Success:    false,
 				StatusCode: http.StatusBadRequest,
-				Error:      "refresh id invalid",
+				Error:      "Refresh ID is required",
 			}
 		}
 
 		return j.Refresh(r, w, refreshId, fp)
 	}
 
-	revokeVal, err := j.redisClient.Get(j.context, "revoke:"+accessToken).Result()
+	revokeVal, err := j.Redis.Get(j.Context, "revoke:"+accessToken).Result()
 	if err == nil && revokeVal != "" {
 		return &AuthResult{
 			Success:    false,
 			StatusCode: http.StatusUnauthorized,
-			Error:      "token revoked",
+			Error:      "Token has been revoked",
+		}
+	} else if err.Error() != "redis: nil" {
+		j.Logger.Verify(true,
+			"Failed to check access token",
+			err.Error(),
+		)
+		return &AuthResult{
+			Success:    false,
+			StatusCode: http.StatusInternalServerError,
+			Error:      "Failed to check access token",
 		}
 	}
 
-	claims, err := parseToken(accessToken, j.config)
+	jwtJson, err := j.parseToken(accessToken, j.Config)
 	if err != nil {
 		if strings.Contains(err.Error(), "expired") {
-			token, _ := jwt.Parse(accessToken, nil)
-			if token == nil || token.Claims == nil {
+			token, err := jwt.Parse(accessToken, nil)
+			if err != nil || token == nil || token.Claims == nil {
+				j.Logger.Verify(true, "Invalid access token-1")
 				return &AuthResult{
 					Success:    false,
 					StatusCode: http.StatusBadRequest,
-					Error:      "access token invalid",
+					Error:      "Invalid access token-1",
 				}
 			}
 
 			claims, ok := token.Claims.(jwt.MapClaims)
 			if !ok {
+				j.Logger.Verify(true, "Invalid access token-2")
 				return &AuthResult{
 					Success:    false,
 					StatusCode: http.StatusBadRequest,
-					Error:      "access token invalid",
+					Error:      "Invalid access token-2",
 				}
 			}
 
-			if claims[j.config.RefreshIdCookieKey].(string) != refreshId {
+			if claims[j.Config.RefreshIdCookieKey].(string) != refreshId {
+				j.Logger.Verify(true, "Invalid Refresh ID-1")
 				return &AuthResult{
 					Success:    false,
 					StatusCode: http.StatusBadRequest,
-					Error:      "refresh id invalid",
+					Error:      "Invalid Refresh ID-1",
 				}
 			}
 
 			if claims["fp"].(string) != fp {
+				j.Logger.Verify(true, "Invalid fingerprint-1")
 				return &AuthResult{
 					Success:    false,
 					StatusCode: http.StatusBadRequest,
-					Error:      "fingerprint invalid",
+					Error:      "Invalid fingerprint",
 				}
 			}
 
 			return j.Refresh(r, w, refreshId, fp)
 		}
 
+		j.Logger.Verify(true, "Invalid access token-3")
 		return &AuthResult{
 			Success:    false,
 			StatusCode: http.StatusBadRequest,
-			Error:      "access token invalid",
+			Error:      "Invalid access token-3",
 		}
 	}
 
-	if jti, exists := claims["jti"]; exists {
+	if jti, exists := jwtJson["jti"]; exists {
 		if err := j.validateJTI(jti.(string)); err != nil {
+			j.Logger.Verify(true, "Invalid JTI")
 			return &AuthResult{
 				Success:    false,
 				StatusCode: http.StatusUnauthorized,
-				Error:      "JWT ID invalid",
+				Error:      "Invalid JTI",
 			}
 		}
 	}
 
-	if claims[j.config.RefreshIdCookieKey].(string) != refreshId {
+	if jwtJson[j.Config.RefreshIdCookieKey].(string) != refreshId {
+		j.Logger.Verify(true, "Invalid Refresh ID-2")
 		return &AuthResult{
 			Success:    false,
 			StatusCode: http.StatusBadRequest,
-			Error:      "refresh id invalid",
+			Error:      "Invalid Refresh ID-2",
 		}
 	}
 
-	if claims["fp"].(string) != fp {
+	if jwtJson["fp"].(string) != fp {
+		j.Logger.Verify(true, "Invalid fingerprint-2")
 		return &AuthResult{
 			Success:    false,
 			StatusCode: http.StatusBadRequest,
-			Error:      "fingerprint invalid",
+			Error:      "Invalid fingerprint-2",
 		}
 	}
 
-	userData := j.GetUserData(claims)
+	userData := j.getUserData(jwtJson)
+
+	j.Logger.Verify(false,
+		"Verify access token successfully",
+		fmt.Sprintf("user: %s", userData.ID),
+	)
 
 	return &AuthResult{
 		Success:    true,
@@ -125,8 +152,9 @@ func (j *JWTAuth) Verify(r *http.Request, w http.ResponseWriter) *AuthResult {
 	}
 }
 
-func (j *JWTAuth) GetAccessToken(r *http.Request) string {
-	if cookie, err := r.Cookie(j.config.AccessTokenCookieKey); err == nil {
+// * private method
+func (j *JWTAuth) getAccessToken(r *http.Request) string {
+	if cookie, err := r.Cookie(j.Config.AccessTokenCookieKey); err == nil {
 		return cookie.Value
 	}
 
@@ -139,18 +167,13 @@ func (j *JWTAuth) GetAccessToken(r *http.Request) string {
 	return ""
 }
 
-// * private function
-func parseToken(tokenString string, config *Config) (jwt.MapClaims, error) {
-	publicKey, err := jwt.ParseECPublicKeyFromPEM([]byte(config.PublicKey))
-	if err != nil {
-		return nil, fmt.Errorf("parse public key failed: %v", err)
-	}
-
+// * private method
+func (j *JWTAuth) parseToken(tokenString string, config *Config) (jwt.MapClaims, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodECDSA); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return publicKey, nil
+		return j.Config.PublicKeyPEM, nil
 	})
 
 	if err != nil {
@@ -183,7 +206,7 @@ func (j *JWTAuth) validateJTI(jti string) error {
 		return fmt.Errorf("missing JWT ID")
 	}
 
-	exists, err := j.redisClient.Exists(j.context, "jti:"+jti).Result()
+	exists, err := j.Redis.Exists(j.Context, "jti:"+jti).Result()
 	if err != nil {
 		return fmt.Errorf("failed to check JWT ID: %v", err)
 	}

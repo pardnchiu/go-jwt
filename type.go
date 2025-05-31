@@ -2,15 +2,18 @@ package golangJwtAuth
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"log"
 	"time"
 
 	"github.com/redis/go-redis/v9"
 )
 
 type JWTAuth struct {
-	config      *Config
-	redisClient *redis.Client
-	context     context.Context
+	Config  *Config
+	Redis   *redis.Client
+	Context context.Context
+	Logger  *Logger
 }
 
 type Config struct {
@@ -28,6 +31,9 @@ type Config struct {
 	RefreshIdCookieKey   string                       `json:"refresh_id_cookie_key,omitempty"`   // Default refresh_id
 	MaxVersion           int                          `json:"max_version,omitempty"`             // Version threshold, default 5
 	RefreshTTL           float64                      `json:"refresh_ttl,omitempty"`             // TTL threshold, default 0.5
+	LogPath              string                       `json:"log_path,omitempty"`
+	PrivateKeyPEM        *ecdsa.PrivateKey            `json:"-"`
+	PublicKeyPEM         *ecdsa.PublicKey             `json:"-"`
 }
 
 type RedisConfig struct {
@@ -66,4 +72,13 @@ type AuthResult struct {
 type TokenResult struct {
 	Token     string `json:"token"`
 	RefreshId string `json:"refresh_id"`
+}
+
+type Logger struct {
+	InitLogger    *log.Logger
+	CreateLogger  *log.Logger
+	RefreshLogger *log.Logger
+	VerifyLogger  *log.Logger
+	RevokeLogger  *log.Logger
+	Path          string
 }

@@ -8,7 +8,8 @@ import (
 	"strings"
 )
 
-func (j *JWTAuth) GetFingerprint(r *http.Request) string {
+// * private method
+func (j *JWTAuth) getFingerprint(r *http.Request) string {
 	if fp := r.Header.Get("X-Session-FP"); fp != "" {
 		return fp
 	}

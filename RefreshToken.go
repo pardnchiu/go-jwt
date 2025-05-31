@@ -10,26 +10,37 @@ import (
 	"github.com/google/uuid"
 )
 
-func (j *JWTAuth) Refresh(r *http.Request, w http.ResponseWriter, refreshId, fp string) *AuthResult {
+func (j *JWTAuth) Refresh(r *http.Request, w http.ResponseWriter, refreshId string, fp string) *AuthResult {
 	dateNow := time.Now()
 
-	refreshData, err := j.GetRefreshData(refreshId, fp)
+	refreshData, err := j.getRefreshData(refreshId, fp)
 	if err != nil || refreshData.Data == nil {
+		j.Logger.Refresh(true,
+			"Invalid Refresh ID",
+			fmt.Sprintf("Refresh ID: %s", refreshId),
+			err.Error(),
+		)
 		return &AuthResult{
 			Success:    false,
 			StatusCode: http.StatusUnauthorized,
-			Error:      "refresh id invalid",
+			Error:      "Invalid Refresh ID",
 		}
 	}
 
 	lockKey := "lock:refresh:" + refreshId
 	lockValue := uuid.New().String()
-	locked, err := j.redisClient.SetNX(j.context, lockKey, lockValue, 5*time.Second).Result()
+	locked, err := j.Redis.SetNX(j.Context, lockKey, lockValue, 5*time.Second).Result()
 	if err != nil || !locked {
+		j.Logger.Refresh(
+			true,
+			"Refresh in progress",
+			fmt.Sprintf("Refresh ID: %s", refreshId),
+			err.Error(),
+		)
 		return &AuthResult{
 			Success:    false,
 			StatusCode: http.StatusTooManyRequests,
-			Error:      "refresh in progress",
+			Error:      "Refresh in progress",
 		}
 	}
 
@@ -41,89 +52,121 @@ func (j *JWTAuth) Refresh(r *http.Request, w http.ResponseWriter, refreshId, fp 
 				return 0
 			end
 		`
-		j.redisClient.Eval(j.context, luaScript, []string{lockKey}, lockValue)
+		j.Redis.Eval(j.Context, luaScript, []string{lockKey}, lockValue)
 	}()
 
 	newJTI := uuid.New().String()
 
-	newRefreshData := map[string]interface{}{
-		"data": map[string]interface{}{
-			"id":        refreshData.Data.ID,
-			"name":      refreshData.Data.Name,
-			"email":     refreshData.Data.Email,
-			"thumbnail": refreshData.Data.Thumbnail,
-			"scope":     refreshData.Data.Scope,
-			"role":      refreshData.Data.Role,
-			"level":     refreshData.Data.Level,
-		},
-		"version": refreshData.Version + 1,
-		"fp":      fp,
-		"exp":     refreshData.EXP,
-		"iat":     refreshData.IAT,
-		"jti":     newJTI,
+	newRefreshData := RefreshData{
+		Data:        refreshData.Data,
+		Version:     refreshData.Version + 1,
+		Fingerprint: fp,
+		EXP:         refreshData.EXP,
+		IAT:         refreshData.IAT,
+		JTI:         newJTI,
 	}
 	newRefreshDataJson, err := json.Marshal(newRefreshData)
 	if err != nil {
+		j.Logger.Refresh(true,
+			"Failed to parse refresh data",
+			fmt.Sprintf("Auth ID: %s", refreshData.Data.ID),
+			err.Error(),
+		)
 		return &AuthResult{
 			Success:    false,
 			StatusCode: http.StatusInternalServerError,
-			Error:      "failed to marshal refresh data",
+			Error:      "Failed to parse refresh data",
 		}
 	}
 
 	// get ttl first, to update refresh data
-	ttl, err := j.redisClient.TTL(j.context, "refresh:"+refreshId).Result()
+	ttl, err := j.Redis.TTL(j.Context, "refresh:"+refreshId).Result()
 	if err == nil && ttl > 0 {
-		if err := j.redisClient.SetEx(j.context, "refresh:"+refreshId, string(newRefreshDataJson), ttl).Err(); err != nil {
-			fmt.Printf("failed to save new refresh data: %v", err)
+		if err := j.Redis.SetEx(j.Context, "refresh:"+refreshId, string(newRefreshDataJson), ttl).Err(); err != nil {
+			j.Logger.Refresh(true,
+				"Failed to store new refresh data in redis",
+				fmt.Sprintf("Auth ID: %s", refreshData.Data.ID),
+				err.Error(),
+			)
 			return &AuthResult{
 				Success:    false,
 				StatusCode: http.StatusInternalServerError,
-				Error:      "failed to save new refresh data",
+				Error:      "Failed to store new refresh data in redis",
 			}
 		}
 	} else {
+		j.Logger.Refresh(true,
+			"Refresh ID is expired",
+			fmt.Sprintf("Auth ID: %s", refreshData.Data.ID),
+			err.Error(),
+		)
 		return &AuthResult{
 			Success:    false,
 			StatusCode: http.StatusUnauthorized,
-			Error:      "refresh token invalid",
+			Error:      "Refresh ID is expired",
 		}
 	}
 
-	if refreshData.Version > j.config.MaxVersion || ttl < time.Duration(float64(j.config.RefreshIdExpires)*j.config.RefreshTTL) {
-		j.redisClient.SetEx(j.context, "refresh:"+refreshId, string(newRefreshDataJson), 5*time.Second)
-		newRefreshId := j.CreateRefreshId(refreshData.Data.ID, refreshData.Data.Name, refreshData.Data.Email, fp)
+	if refreshData.Version > j.Config.MaxVersion || ttl < time.Duration(float64(j.Config.RefreshIdExpires)*j.Config.RefreshTTL) {
+		j.Redis.SetEx(j.Context, "refresh:"+refreshId, string(newRefreshDataJson), 5*time.Second)
 
-		newRefreshData["version"] = 0
-		newRefreshDataJson, err := json.Marshal(newRefreshData)
+		newRefreshId, err := j.createRefreshId(refreshData.Data.ID, refreshData.Data.Name, refreshData.Data.Email, fp)
 		if err != nil {
+			j.Logger.Create(true,
+				"Failed to create New Refresh ID",
+				err.Error(),
+			)
 			return &AuthResult{
 				Success:    false,
 				StatusCode: http.StatusInternalServerError,
-				Error:      "failed to marshal refresh data",
+				Error:      "Failed to create New Refresh ID",
 			}
 		}
 
-		if err := j.redisClient.SetEx(j.context, "refresh:"+newRefreshId, string(newRefreshDataJson), ttl).Err(); err != nil {
-			fmt.Printf("failed to save new refresh data: %v", err)
+		newRefreshData.Version = 0
+		newRefreshDataJson, err := json.Marshal(newRefreshData)
+		if err != nil {
+			j.Logger.Refresh(true,
+				"Failed to parse new refresh data",
+				fmt.Sprintf("Auth ID: %s", refreshData.Data.ID),
+				err.Error(),
+			)
 			return &AuthResult{
 				Success:    false,
 				StatusCode: http.StatusInternalServerError,
-				Error:      "failed to save new refresh data",
+				Error:      "Failed to parse new refresh data",
+			}
+		}
+
+		if err := j.Redis.SetEx(j.Context, "refresh:"+newRefreshId, string(newRefreshDataJson), ttl).Err(); err != nil {
+			j.Logger.Refresh(true,
+				"Failed to store new refresh data in redis",
+				fmt.Sprintf("Auth ID: %s", refreshData.Data.ID),
+				err.Error(),
+			)
+			return &AuthResult{
+				Success:    false,
+				StatusCode: http.StatusInternalServerError,
+				Error:      "Failed to store new refresh data in redis",
 			}
 		}
 
 		w.Header().Set("X-New-Refresh-ID", newRefreshId)
-		j.SetCookie(w, j.config.RefreshIdCookieKey, newRefreshId, dateNow.Add(j.config.RefreshIdExpires))
+		j.setCookie(w, j.Config.RefreshIdCookieKey, newRefreshId, dateNow.Add(j.Config.RefreshIdExpires))
 	}
 
-	if j.config.CheckUserExists != nil {
-		exists, err := j.config.CheckUserExists(*refreshData.Data)
+	if j.Config.CheckUserExists != nil {
+		exists, err := j.Config.CheckUserExists(*refreshData.Data)
 		if err != nil || !exists {
+			j.Logger.Refresh(true,
+				"User does not exist",
+				fmt.Sprintf("Auth ID: %s", refreshData.Data.ID),
+				err.Error(),
+			)
 			return &AuthResult{
 				Success:    false,
 				StatusCode: http.StatusUnauthorized,
-				Error:      "unauthorized",
+				Error:      "User does not exist",
 			}
 		}
 	}
@@ -139,40 +182,45 @@ func (j *JWTAuth) Refresh(r *http.Request, w http.ResponseWriter, refreshId, fp 
 		"fp":         fp,
 		"refresh_id": refreshId,
 		"jti":        newJTI,
-		"exp":        dateNow.Add(j.config.AccessTokenExpires).Unix(),
+		"exp":        dateNow.Add(j.Config.AccessTokenExpires).Unix(),
 		"iat":        dateNow.Unix(),
 		"nbf":        dateNow.Unix(),
 	})
 
-	privateKey, err := jwt.ParseECPrivateKeyFromPEM([]byte(j.config.PrivateKey))
+	newAccessToken, err := token.SignedString(j.Config.PrivateKeyPEM)
 	if err != nil {
+		j.Logger.Refresh(true,
+			"Failed to sign new access token",
+			fmt.Sprintf("Auth ID: %s", refreshData.Data.ID),
+			err.Error(),
+		)
 		return &AuthResult{
 			Success:    false,
 			StatusCode: http.StatusInternalServerError,
-			Error:      "private key invalid",
+			Error:      "Failed to sign new access token",
 		}
 	}
 
-	newAccessToken, err := token.SignedString(privateKey)
-	if err != nil {
+	if err := j.Redis.SetEx(j.Context, "jti:"+newJTI, "1", j.Config.AccessTokenExpires).Err(); err != nil {
+		j.Logger.Refresh(true,
+			"Failed to store JTI in redis",
+			fmt.Sprintf("Auth ID: %s", refreshData.Data.ID),
+			err.Error(),
+		)
 		return &AuthResult{
 			Success:    false,
 			StatusCode: http.StatusInternalServerError,
-			Error:      "failed to sign token",
+			Error:      "Failed to store JTI in redis",
 		}
 	}
 
-	if err := j.redisClient.SetEx(j.context, "jti:"+newJTI, "1", j.config.AccessTokenExpires).Err(); err != nil {
-		fmt.Printf("failed to store JTI in redis: %v", err)
-		return &AuthResult{
-			Success:    false,
-			StatusCode: http.StatusInternalServerError,
-			Error:      "failed to store JTI in redis",
-		}
-	}
+	j.Logger.Refresh(false,
+		"Refreshed access token successfully",
+		fmt.Sprintf("user: %s", refreshData.Data.ID),
+	)
 
 	w.Header().Set("X-New-Access-Token", newAccessToken)
-	j.SetCookie(w, j.config.AccessTokenCookieKey, newAccessToken, dateNow.Add(j.config.AccessTokenExpires))
+	j.setCookie(w, j.Config.AccessTokenCookieKey, newAccessToken, dateNow.Add(j.Config.AccessTokenExpires))
 
 	return &AuthResult{
 		Success:    true,

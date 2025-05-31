@@ -266,6 +266,9 @@ func main() {
 - `CheckUserExists`: user existence check function
 - `AccessTokenCookieKey`: access token cookie name (default: 'access_token')
 - `RefreshTokenCookieKey`: refresh id cookie name (default: 'refresh_id')
+- `MaxVersion`: Version threshold (default: 5)
+- `RefreshTTL`: TTL threshold (default: 0.5)
+- `LogPath`: Custom log path (default: './logs/golangJWTAuth')
 
 ### Supported methods
 
@@ -277,10 +280,6 @@ func main() {
    - `X-Device-ID`: Device ID
 
 ## Token refresh
-
-The system automatically generates a new Refresh ID in the following cases:
-- Refresh version exceeds 5 times
-- Remaining Refresh Token time is less than half
 
 The new tokens are returned via:
 - HTTP Header: `X-New-Access-Token`
@@ -302,10 +301,3 @@ All main methods return an `AuthResult` struct, including:
 - `StatusCode`: HTTP status code
 - `Error`: Error message
 - `Data`: User data (on success)
-
-Common error types:
-- `unauthorized`: Unauthorized
-- `token revoked`: Token has been revoked  
-- `fingerprint invalid`: Fingerprint mismatch
-- `refresh id invalid`: Invalid Refresh ID
-- `access token invalid`: Invalid Access Token

@@ -5,7 +5,8 @@ import (
 	"time"
 )
 
-func (j *JWTAuth) SetCookie(w http.ResponseWriter, name, value string, expires time.Time) {
+// * private method
+func (j *JWTAuth) setCookie(w http.ResponseWriter, name, value string, expires time.Time) {
 	cookie := &http.Cookie{
 		Name:     name,
 		Value:    value,
@@ -13,12 +14,12 @@ func (j *JWTAuth) SetCookie(w http.ResponseWriter, name, value string, expires t
 		Expires:  expires,
 		MaxAge:   int(time.Until(expires).Seconds()),
 		HttpOnly: true,
-		Secure:   j.config.IsProd,
+		Secure:   j.Config.IsProd,
 	}
 
-	if j.config.IsProd {
+	if j.Config.IsProd {
 		cookie.SameSite = http.SameSiteNoneMode
-		cookie.Domain = j.config.Domain
+		cookie.Domain = j.Config.Domain
 	} else {
 		cookie.SameSite = http.SameSiteLaxMode
 		cookie.Domain = "localhost"
@@ -27,7 +28,8 @@ func (j *JWTAuth) SetCookie(w http.ResponseWriter, name, value string, expires t
 	http.SetCookie(w, cookie)
 }
 
-func (j *JWTAuth) ClearCookie(w http.ResponseWriter, name string) {
+// * private method
+func (j *JWTAuth) clearCookie(w http.ResponseWriter, name string) {
 	cookie := &http.Cookie{
 		Name:     name,
 		Value:    "",
@@ -35,12 +37,12 @@ func (j *JWTAuth) ClearCookie(w http.ResponseWriter, name string) {
 		Expires:  time.Unix(0, 0),
 		MaxAge:   -1,
 		HttpOnly: true,
-		Secure:   j.config.IsProd,
+		Secure:   j.Config.IsProd,
 	}
 
-	if j.config.IsProd {
+	if j.Config.IsProd {
 		cookie.SameSite = http.SameSiteNoneMode
-		cookie.Domain = j.config.Domain
+		cookie.Domain = j.Config.Domain
 	} else {
 		cookie.SameSite = http.SameSiteLaxMode
 		cookie.Domain = "localhost"

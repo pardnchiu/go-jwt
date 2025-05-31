@@ -34,7 +34,7 @@ func main() {
 		// 生產環境: Domain = Domain, SameSite = None, Secure = true
 		// 測試環境: Domain = "localhost", SameSite = Lax, Secure = false
 		IsProd: false,
-		Domain: "axonews.ai",
+		Domain: "pardn.io",
 		// 用於 refresh token 時判斷資料庫中會員是否存在來決定是否重簽
 		// 回傳 false 則會取消重簽清除 token
 		CheckUserExists: func(userData golangJwtAuth.AuthData) (bool, error) {

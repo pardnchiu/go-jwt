@@ -1,8 +1,6 @@
 package golangJwtAuth
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -14,15 +12,24 @@ import (
 
 func (j *JWTAuth) Create(r *http.Request, w http.ResponseWriter, u *AuthData) (*TokenResult, error) {
 	if u == nil {
-		return nil, fmt.Errorf("user data is required")
+		j.Logger.Create(true, "Auth data is required")
+		return nil, fmt.Errorf("Auth data is required")
 	}
 
-	fp := j.GetFingerprint(r)
+	fp := j.getFingerprint(r)
+
+	refreshId, err := j.createRefreshId(u.ID, u.Name, u.Email, fp)
+	if err != nil {
+		j.Logger.Create(true,
+			"Failed to create Refresh ID",
+			fmt.Sprintf("Auth ID: %s", u.ID),
+			err.Error(),
+		)
+		return nil, fmt.Errorf("Failed to create Refresh ID: %v", err)
+	}
+
 	dateNow := time.Now()
-	refreshId := j.CreateRefreshId(u.ID, u.Name, u.Email, fp)
-
 	jwtID := uuid.New().String()
-
 	claims := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims{
 		"id":         u.ID,
 		"name":       u.Name,
@@ -34,66 +41,62 @@ func (j *JWTAuth) Create(r *http.Request, w http.ResponseWriter, u *AuthData) (*
 		"fp":         fp,
 		"jti":        jwtID,
 		"refresh_id": refreshId,
-		"exp":        dateNow.Add(j.config.AccessTokenExpires).Unix(),
+		"exp":        dateNow.Add(j.Config.AccessTokenExpires).Unix(),
 		"iat":        dateNow.Unix(),
 		"nbf":        dateNow.Unix(),
 	})
 
-	privateKey, err := jwt.ParseECPrivateKeyFromPEM([]byte(j.config.PrivateKey))
+	accessToken, err := claims.SignedString(j.Config.PrivateKeyPEM)
 	if err != nil {
-		return nil, fmt.Errorf("private key invalid: %v", err)
+		j.Logger.Create(true,
+			"Failed to sign access token",
+			fmt.Sprintf("Auth ID: %s", u.ID),
+			err.Error(),
+		)
+		return nil, fmt.Errorf("Failed to sign access token: %v", err)
 	}
 
-	accessToken, err := claims.SignedString(privateKey)
+	j.setCookie(w, j.Config.AccessTokenCookieKey, accessToken, dateNow.Add(j.Config.AccessTokenExpires))
+	j.setCookie(w, j.Config.RefreshIdCookieKey, refreshId, dateNow.Add(j.Config.RefreshIdExpires))
+
+	refreshData := RefreshData{
+		Data:        u,
+		Version:     1,
+		Fingerprint: fp,
+		EXP:         dateNow.Add(j.Config.AccessTokenExpires).Unix(),
+		IAT:         dateNow.Unix(),
+		JTI:         jwtID,
+	}
+	refreshDataJson, err := json.Marshal(refreshData)
 	if err != nil {
-		return nil, fmt.Errorf("failed to sign token: %v", err)
+		j.Logger.Create(true,
+			"Failed to parse refresh data",
+			fmt.Sprintf("Auth ID: %s", u.ID),
+			err.Error(),
+		)
+		return nil, fmt.Errorf("Failed to parse refresh data: %v", err)
 	}
 
-	j.SetCookie(w, j.config.AccessTokenCookieKey, accessToken, dateNow.Add(j.config.AccessTokenExpires))
-	j.SetCookie(w, j.config.RefreshIdCookieKey, refreshId, dateNow.Add(j.config.RefreshIdExpires))
-
-	refreshData, _ := json.Marshal(map[string]interface{}{
-		"data": map[string]interface{}{
-			"id":        u.ID,
-			"name":      u.Name,
-			"email":     u.Email,
-			"thumbnail": u.Thumbnail,
-			"scope":     u.Scope,
-			"role":      u.Role,
-			"level":     u.Level,
-		},
-		"version": 1,
-		"fp":      fp,
-		"exp":     dateNow.Add(j.config.AccessTokenExpires).Unix(),
-		"iat":     dateNow.Unix(),
-		"jti":     jwtID,
-	})
-
-	pipe := j.redisClient.TxPipeline()
-	pipe.SetEx(j.context, "refresh:"+refreshId, string(refreshData), j.config.RefreshIdExpires)
-	pipe.SetEx(j.context, "jti:"+jwtID, "1", j.config.AccessTokenExpires)
-	_, err = pipe.Exec(j.context)
+	pipe := j.Redis.TxPipeline()
+	pipe.SetEx(j.Context, "refresh:"+refreshId, string(refreshDataJson), j.Config.RefreshIdExpires)
+	pipe.SetEx(j.Context, "jti:"+jwtID, "1", j.Config.AccessTokenExpires)
+	_, err = pipe.Exec(j.Context)
 	if err != nil {
-		return nil, fmt.Errorf("failed to save to redis: %v", err)
+		j.Logger.Create(true,
+			"Failed to store RefreshID/JTI in redis",
+			fmt.Sprintf("Auth ID: %s", u.ID),
+			err.Error(),
+		)
+		return nil, fmt.Errorf("Failed to store Refresh ID/JTI in redis: %v", err)
 	}
+
+	j.Logger.Create(false,
+		"Created access token successfully",
+		fmt.Sprintf("Auth ID: %s", u.ID),
+	)
 
 	return &TokenResult{
 		Token:     accessToken,
 		RefreshId: refreshId,
 	}, nil
-}
-
-func (j *JWTAuth) CreateRefreshId(userID, name, email, fp string) string {
-	data := map[string]interface{}{
-		"id":    userID,
-		"name":  name,
-		"email": email,
-		"fp":    fp,
-		"iat":   time.Now(),
-	}
-
-	jsonData, _ := json.Marshal(data)
-	hash := sha256.Sum256(jsonData)
-
-	return hex.EncodeToString(hash[:])
 }

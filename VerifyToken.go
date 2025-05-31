@@ -24,7 +24,7 @@ func (j *JWTAuth) Verify(r *http.Request, w http.ResponseWriter) *AuthResult {
 
 	if accessToken == "" && refreshId != "" {
 		if _, err := j.getRefreshData(refreshId, fp); err != nil {
-			j.Logger.Refresh(true,
+			j.Logger.Error(
 				"Refresh ID is required",
 				err.Error(),
 			)
@@ -46,7 +46,7 @@ func (j *JWTAuth) Verify(r *http.Request, w http.ResponseWriter) *AuthResult {
 			Error:      "Token has been revoked",
 		}
 	} else if err.Error() != "redis: nil" {
-		j.Logger.Verify(true,
+		j.Logger.Error(
 			"Failed to check access token",
 			err.Error(),
 		)
@@ -57,12 +57,12 @@ func (j *JWTAuth) Verify(r *http.Request, w http.ResponseWriter) *AuthResult {
 		}
 	}
 
-	jwtJson, err := j.parseToken(accessToken, j.Config)
+	jwtJson, err := j.parseToken(accessToken)
 	if err != nil {
 		if strings.Contains(err.Error(), "expired") {
 			token, err := jwt.Parse(accessToken, nil)
 			if err != nil || token == nil || token.Claims == nil {
-				j.Logger.Verify(true, "Invalid access token-1")
+				j.Logger.Error("Invalid access token-1")
 				return &AuthResult{
 					Success:    false,
 					StatusCode: http.StatusBadRequest,
@@ -72,7 +72,7 @@ func (j *JWTAuth) Verify(r *http.Request, w http.ResponseWriter) *AuthResult {
 
 			claims, ok := token.Claims.(jwt.MapClaims)
 			if !ok {
-				j.Logger.Verify(true, "Invalid access token-2")
+				j.Logger.Error("Invalid access token-2")
 				return &AuthResult{
 					Success:    false,
 					StatusCode: http.StatusBadRequest,
@@ -81,7 +81,7 @@ func (j *JWTAuth) Verify(r *http.Request, w http.ResponseWriter) *AuthResult {
 			}
 
 			if claims[j.Config.RefreshIdCookieKey].(string) != refreshId {
-				j.Logger.Verify(true, "Invalid Refresh ID-1")
+				j.Logger.Error("Invalid Refresh ID-1")
 				return &AuthResult{
 					Success:    false,
 					StatusCode: http.StatusBadRequest,
@@ -90,7 +90,7 @@ func (j *JWTAuth) Verify(r *http.Request, w http.ResponseWriter) *AuthResult {
 			}
 
 			if claims["fp"].(string) != fp {
-				j.Logger.Verify(true, "Invalid fingerprint-1")
+				j.Logger.Error("Invalid fingerprint-1")
 				return &AuthResult{
 					Success:    false,
 					StatusCode: http.StatusBadRequest,
@@ -101,7 +101,7 @@ func (j *JWTAuth) Verify(r *http.Request, w http.ResponseWriter) *AuthResult {
 			return j.Refresh(r, w, refreshId, fp)
 		}
 
-		j.Logger.Verify(true, "Invalid access token-3")
+		j.Logger.Error("Invalid access token-3")
 		return &AuthResult{
 			Success:    false,
 			StatusCode: http.StatusBadRequest,
@@ -111,7 +111,7 @@ func (j *JWTAuth) Verify(r *http.Request, w http.ResponseWriter) *AuthResult {
 
 	if jti, exists := jwtJson["jti"]; exists {
 		if err := j.validateJTI(jti.(string)); err != nil {
-			j.Logger.Verify(true, "Invalid JTI")
+			j.Logger.Error("Invalid JTI")
 			return &AuthResult{
 				Success:    false,
 				StatusCode: http.StatusUnauthorized,
@@ -121,7 +121,7 @@ func (j *JWTAuth) Verify(r *http.Request, w http.ResponseWriter) *AuthResult {
 	}
 
 	if jwtJson[j.Config.RefreshIdCookieKey].(string) != refreshId {
-		j.Logger.Verify(true, "Invalid Refresh ID-2")
+		j.Logger.Error("Invalid Refresh ID-2")
 		return &AuthResult{
 			Success:    false,
 			StatusCode: http.StatusBadRequest,
@@ -130,7 +130,7 @@ func (j *JWTAuth) Verify(r *http.Request, w http.ResponseWriter) *AuthResult {
 	}
 
 	if jwtJson["fp"].(string) != fp {
-		j.Logger.Verify(true, "Invalid fingerprint-2")
+		j.Logger.Error("Invalid fingerprint-2")
 		return &AuthResult{
 			Success:    false,
 			StatusCode: http.StatusBadRequest,
@@ -140,7 +140,7 @@ func (j *JWTAuth) Verify(r *http.Request, w http.ResponseWriter) *AuthResult {
 
 	userData := j.getUserData(jwtJson)
 
-	j.Logger.Verify(false,
+	j.Logger.Info(
 		"Verify access token successfully",
 		fmt.Sprintf("user: %s", userData.ID),
 	)
@@ -168,7 +168,7 @@ func (j *JWTAuth) getAccessToken(r *http.Request) string {
 }
 
 // * private method
-func (j *JWTAuth) parseToken(tokenString string, config *Config) (jwt.MapClaims, error) {
+func (j *JWTAuth) parseToken(tokenString string) (jwt.MapClaims, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodECDSA); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
@@ -201,6 +201,7 @@ func (j *JWTAuth) parseToken(tokenString string, config *Config) (jwt.MapClaims,
 	return nil, fmt.Errorf("invalid token")
 }
 
+// * private method
 func (j *JWTAuth) validateJTI(jti string) error {
 	if jti == "" {
 		return fmt.Errorf("missing JWT ID")

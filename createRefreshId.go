@@ -9,13 +9,14 @@ import (
 )
 
 // * private method
-func (j *JWTAuth) createRefreshId(userID, name, email, fp string) (string, error) {
-	data := map[string]interface{}{
-		"id":    userID,
-		"name":  name,
-		"email": email,
-		"fp":    fp,
-		"iat":   time.Now().Unix(),
+func (j *JWTAuth) createRefreshId(userID string, name string, email string, fp string, jti string) (string, error) {
+	data := &RefreshID{
+		ID:          userID,
+		Name:        name,
+		Email:       email,
+		Fingerprint: fp,
+		IAT:         time.Now().Unix(),
+		JTI:         jti,
 	}
 
 	jsonData, err := json.Marshal(data)

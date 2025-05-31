@@ -3,7 +3,6 @@ package golangJwtAuth
 import (
 	"context"
 	"crypto/ecdsa"
-	"log"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -32,6 +31,7 @@ type Config struct {
 	MaxVersion           int                          `json:"max_version,omitempty"`             // Version threshold, default 5
 	RefreshTTL           float64                      `json:"refresh_ttl,omitempty"`             // TTL threshold, default 0.5
 	LogPath              string                       `json:"log_path,omitempty"`
+	LogStdout            bool                         `json:"log_stdout,omitempty"` // Default true
 	PrivateKeyPEM        *ecdsa.PrivateKey            `json:"-"`
 	PublicKeyPEM         *ecdsa.PublicKey             `json:"-"`
 }
@@ -53,6 +53,15 @@ type AuthData struct {
 	Level     int      `json:"level,omitempty"`
 }
 
+type RefreshID struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Email       string `json:"email"`
+	Fingerprint string `json:"fp"`
+	IAT         int64  `json:"iat"`
+	JTI         string `json:"jti"`
+}
+
 type RefreshData struct {
 	Data        *AuthData `json:"data,omitempty"`
 	Version     int       `json:"version"`
@@ -72,13 +81,4 @@ type AuthResult struct {
 type TokenResult struct {
 	Token     string `json:"token"`
 	RefreshId string `json:"refresh_id"`
-}
-
-type Logger struct {
-	InitLogger    *log.Logger
-	CreateLogger  *log.Logger
-	RefreshLogger *log.Logger
-	VerifyLogger  *log.Logger
-	RevokeLogger  *log.Logger
-	Path          string
 }

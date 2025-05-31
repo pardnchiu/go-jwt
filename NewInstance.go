@@ -19,7 +19,12 @@ func New(c *Config) (*JWTAuth, error) {
 		c.LogPath = "./logs/golangJWTAuth"
 	}
 
-	logger, err := NewLogger(c.LogPath)
+	logger, err := newLogger(LoggerConfig{
+		Path:    c.LogPath,
+		MaxSize: 16 * 1024 * 1024,
+		rw:      0644,
+		Stdout:  c.LogStdout,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("Failed to init logger: %v", err)
 	}
@@ -27,19 +32,22 @@ func New(c *Config) (*JWTAuth, error) {
 	if c.PrivateKeyPath != "" {
 		privateKeyBytes, err := os.ReadFile(c.PrivateKeyPath)
 		if err != nil {
-			logger.Init(true, "Private key not exists", err.Error())
-			return nil, fmt.Errorf("Private key not exists: %v", err)
+			return nil, logger.Error(
+				"Private key not exists",
+				err.Error(),
+			)
 		}
 		c.PrivateKey = string(privateKeyBytes)
 	} else if c.PrivateKey == "" {
-		logger.Init(true, "Private key is required")
-		return nil, fmt.Errorf("Private key is required")
+		return nil, logger.Error("Private key is required")
 	}
 
 	privateKey, err := jwt.ParseECPrivateKeyFromPEM([]byte(c.PrivateKey))
 	if err != nil {
-		logger.Init(true, "Invalid private key", err.Error())
-		return nil, fmt.Errorf("Invalid private key: %v", err)
+		return nil, logger.Error(
+			"Invalid private key",
+			err.Error(),
+		)
 	}
 
 	c.PrivateKeyPEM = privateKey
@@ -47,26 +55,28 @@ func New(c *Config) (*JWTAuth, error) {
 	if c.PublicKeyPath != "" {
 		publicKeyBytes, err := os.ReadFile(c.PublicKeyPath)
 		if err != nil {
-			logger.Init(true, "Public key not exists", err.Error())
-			return nil, fmt.Errorf("Public key not exists: %v", err)
+			return nil, logger.Error(
+				"Public key not exists",
+				err.Error(),
+			)
 		}
 		c.PublicKey = string(publicKeyBytes)
 	} else if c.PublicKey == "" {
-		logger.Init(true, "Public key is required")
-		return nil, fmt.Errorf("Public key is required")
+		return nil, logger.Error("Public key is required")
 	}
 
 	publicKey, err := jwt.ParseECPublicKeyFromPEM([]byte(c.PublicKey))
 	if err != nil {
-		logger.Init(true, "Invalid public key", err.Error())
-		return nil, fmt.Errorf("Invalid public key: %v", err)
+		return nil, logger.Error(
+			"Invalid public key",
+			err.Error(),
+		)
 	}
 
 	c.PublicKeyPEM = publicKey
 
 	if !c.PrivateKeyPEM.PublicKey.Equal(c.PublicKeyPEM) {
-		logger.Init(true, "Private/Public mismatch")
-		return nil, fmt.Errorf("Private/Public mismatch")
+		return nil, logger.Error("Private/Public mismatch")
 	}
 
 	if c.AccessTokenExpires == 0 {
@@ -106,11 +116,13 @@ func New(c *Config) (*JWTAuth, error) {
 	context := context.Background()
 
 	if _, err := redisClient.Ping(context).Result(); err != nil {
-		logger.Init(true, "Failed to connect Redis", err.Error())
-		return nil, fmt.Errorf("Failed to connect Redis: %v", err)
+		return nil, logger.Error(
+			"Failed to connect Redis",
+			err.Error(),
+		)
 	}
 
-	logger.Init(false,
+	logger.Info(
 		"golangJwtAuth initialized successfully",
 		fmt.Sprintf("AccessTokenExpires: %s", c.AccessTokenExpires),
 		fmt.Sprintf("RefreshIdExpires: %s", c.RefreshIdExpires),

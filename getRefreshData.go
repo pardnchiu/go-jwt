@@ -81,7 +81,7 @@ func (j *JWTAuth) getRefreshId(r *http.Request) string {
 }
 
 // * private method
-func (j *JWTAuth) getRefreshData(refreshId, fp string) (*RefreshData, error) {
+func (j *JWTAuth) getRefreshData(refreshId string, fp string) (*RefreshData, error) {
 	refreshDataJson, err := j.Redis.Get(j.Context, "refresh:"+refreshId).Result()
 	if err != nil {
 		return nil, err

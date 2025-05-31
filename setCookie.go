@@ -6,7 +6,7 @@ import (
 )
 
 // * private method
-func (j *JWTAuth) setCookie(w http.ResponseWriter, name, value string, expires time.Time) {
+func (j *JWTAuth) setCookie(w http.ResponseWriter, name string, value string, expires time.Time) {
 	cookie := &http.Cookie{
 		Name:     name,
 		Value:    value,

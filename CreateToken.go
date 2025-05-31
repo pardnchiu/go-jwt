@@ -12,24 +12,22 @@ import (
 
 func (j *JWTAuth) Create(r *http.Request, w http.ResponseWriter, u *AuthData) (*TokenResult, error) {
 	if u == nil {
-		j.Logger.Create(true, "Auth data is required")
-		return nil, fmt.Errorf("Auth data is required")
-	}
-
-	fp := j.getFingerprint(r)
-
-	refreshId, err := j.createRefreshId(u.ID, u.Name, u.Email, fp)
-	if err != nil {
-		j.Logger.Create(true,
-			"Failed to create Refresh ID",
-			fmt.Sprintf("Auth ID: %s", u.ID),
-			err.Error(),
-		)
-		return nil, fmt.Errorf("Failed to create Refresh ID: %v", err)
+		return nil, j.Logger.Error("Auth data is required")
 	}
 
 	dateNow := time.Now()
 	jwtID := uuid.New().String()
+	fp := j.getFingerprint(r)
+
+	refreshId, err := j.createRefreshId(u.ID, u.Name, u.Email, fp, jwtID)
+	if err != nil {
+		return nil, j.Logger.Error(
+			"Failed to create Refresh ID",
+			fmt.Sprintf("Auth ID: %s", u.ID),
+			err.Error(),
+		)
+	}
+
 	claims := jwt.NewWithClaims(jwt.SigningMethodES256, jwt.MapClaims{
 		"id":         u.ID,
 		"name":       u.Name,
@@ -48,12 +46,11 @@ func (j *JWTAuth) Create(r *http.Request, w http.ResponseWriter, u *AuthData) (*
 
 	accessToken, err := claims.SignedString(j.Config.PrivateKeyPEM)
 	if err != nil {
-		j.Logger.Create(true,
+		return nil, j.Logger.Error(
 			"Failed to sign access token",
 			fmt.Sprintf("Auth ID: %s", u.ID),
 			err.Error(),
 		)
-		return nil, fmt.Errorf("Failed to sign access token: %v", err)
 	}
 
 	j.setCookie(w, j.Config.AccessTokenCookieKey, accessToken, dateNow.Add(j.Config.AccessTokenExpires))
@@ -69,12 +66,11 @@ func (j *JWTAuth) Create(r *http.Request, w http.ResponseWriter, u *AuthData) (*
 	}
 	refreshDataJson, err := json.Marshal(refreshData)
 	if err != nil {
-		j.Logger.Create(true,
+		return nil, j.Logger.Error(
 			"Failed to parse refresh data",
 			fmt.Sprintf("Auth ID: %s", u.ID),
 			err.Error(),
 		)
-		return nil, fmt.Errorf("Failed to parse refresh data: %v", err)
 	}
 
 	pipe := j.Redis.TxPipeline()
@@ -82,15 +78,14 @@ func (j *JWTAuth) Create(r *http.Request, w http.ResponseWriter, u *AuthData) (*
 	pipe.SetEx(j.Context, "jti:"+jwtID, "1", j.Config.AccessTokenExpires)
 	_, err = pipe.Exec(j.Context)
 	if err != nil {
-		j.Logger.Create(true,
+		return nil, j.Logger.Error(
 			"Failed to store RefreshID/JTI in redis",
 			fmt.Sprintf("Auth ID: %s", u.ID),
 			err.Error(),
 		)
-		return nil, fmt.Errorf("Failed to store Refresh ID/JTI in redis: %v", err)
 	}
 
-	j.Logger.Create(false,
+	j.Logger.Info(
 		"Created access token successfully",
 		fmt.Sprintf("Auth ID: %s", u.ID),
 	)

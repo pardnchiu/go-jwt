@@ -15,7 +15,7 @@ func (j *JWTAuth) Refresh(r *http.Request, w http.ResponseWriter, refreshId stri
 
 	refreshData, err := j.getRefreshData(refreshId, fp)
 	if err != nil || refreshData.Data == nil {
-		j.Logger.Refresh(true,
+		j.Logger.Error(
 			"Invalid Refresh ID",
 			fmt.Sprintf("Refresh ID: %s", refreshId),
 			err.Error(),
@@ -31,8 +31,7 @@ func (j *JWTAuth) Refresh(r *http.Request, w http.ResponseWriter, refreshId stri
 	lockValue := uuid.New().String()
 	locked, err := j.Redis.SetNX(j.Context, lockKey, lockValue, 5*time.Second).Result()
 	if err != nil || !locked {
-		j.Logger.Refresh(
-			true,
+		j.Logger.Error(
 			"Refresh in progress",
 			fmt.Sprintf("Refresh ID: %s", refreshId),
 			err.Error(),
@@ -67,7 +66,7 @@ func (j *JWTAuth) Refresh(r *http.Request, w http.ResponseWriter, refreshId stri
 	}
 	newRefreshDataJson, err := json.Marshal(newRefreshData)
 	if err != nil {
-		j.Logger.Refresh(true,
+		j.Logger.Error(
 			"Failed to parse refresh data",
 			fmt.Sprintf("Auth ID: %s", refreshData.Data.ID),
 			err.Error(),
@@ -83,7 +82,7 @@ func (j *JWTAuth) Refresh(r *http.Request, w http.ResponseWriter, refreshId stri
 	ttl, err := j.Redis.TTL(j.Context, "refresh:"+refreshId).Result()
 	if err == nil && ttl > 0 {
 		if err := j.Redis.SetEx(j.Context, "refresh:"+refreshId, string(newRefreshDataJson), ttl).Err(); err != nil {
-			j.Logger.Refresh(true,
+			j.Logger.Error(
 				"Failed to store new refresh data in redis",
 				fmt.Sprintf("Auth ID: %s", refreshData.Data.ID),
 				err.Error(),
@@ -95,7 +94,7 @@ func (j *JWTAuth) Refresh(r *http.Request, w http.ResponseWriter, refreshId stri
 			}
 		}
 	} else {
-		j.Logger.Refresh(true,
+		j.Logger.Error(
 			"Refresh ID is expired",
 			fmt.Sprintf("Auth ID: %s", refreshData.Data.ID),
 			err.Error(),
@@ -110,9 +109,9 @@ func (j *JWTAuth) Refresh(r *http.Request, w http.ResponseWriter, refreshId stri
 	if refreshData.Version > j.Config.MaxVersion || ttl < time.Duration(float64(j.Config.RefreshIdExpires)*j.Config.RefreshTTL) {
 		j.Redis.SetEx(j.Context, "refresh:"+refreshId, string(newRefreshDataJson), 5*time.Second)
 
-		newRefreshId, err := j.createRefreshId(refreshData.Data.ID, refreshData.Data.Name, refreshData.Data.Email, fp)
+		newRefreshId, err := j.createRefreshId(refreshData.Data.ID, refreshData.Data.Name, refreshData.Data.Email, fp, newJTI)
 		if err != nil {
-			j.Logger.Create(true,
+			j.Logger.Error(
 				"Failed to create New Refresh ID",
 				err.Error(),
 			)
@@ -126,7 +125,7 @@ func (j *JWTAuth) Refresh(r *http.Request, w http.ResponseWriter, refreshId stri
 		newRefreshData.Version = 0
 		newRefreshDataJson, err := json.Marshal(newRefreshData)
 		if err != nil {
-			j.Logger.Refresh(true,
+			j.Logger.Error(
 				"Failed to parse new refresh data",
 				fmt.Sprintf("Auth ID: %s", refreshData.Data.ID),
 				err.Error(),
@@ -139,7 +138,7 @@ func (j *JWTAuth) Refresh(r *http.Request, w http.ResponseWriter, refreshId stri
 		}
 
 		if err := j.Redis.SetEx(j.Context, "refresh:"+newRefreshId, string(newRefreshDataJson), ttl).Err(); err != nil {
-			j.Logger.Refresh(true,
+			j.Logger.Error(
 				"Failed to store new refresh data in redis",
 				fmt.Sprintf("Auth ID: %s", refreshData.Data.ID),
 				err.Error(),
@@ -158,7 +157,7 @@ func (j *JWTAuth) Refresh(r *http.Request, w http.ResponseWriter, refreshId stri
 	if j.Config.CheckUserExists != nil {
 		exists, err := j.Config.CheckUserExists(*refreshData.Data)
 		if err != nil || !exists {
-			j.Logger.Refresh(true,
+			j.Logger.Error(
 				"User does not exist",
 				fmt.Sprintf("Auth ID: %s", refreshData.Data.ID),
 				err.Error(),
@@ -189,7 +188,7 @@ func (j *JWTAuth) Refresh(r *http.Request, w http.ResponseWriter, refreshId stri
 
 	newAccessToken, err := token.SignedString(j.Config.PrivateKeyPEM)
 	if err != nil {
-		j.Logger.Refresh(true,
+		j.Logger.Error(
 			"Failed to sign new access token",
 			fmt.Sprintf("Auth ID: %s", refreshData.Data.ID),
 			err.Error(),
@@ -202,7 +201,7 @@ func (j *JWTAuth) Refresh(r *http.Request, w http.ResponseWriter, refreshId stri
 	}
 
 	if err := j.Redis.SetEx(j.Context, "jti:"+newJTI, "1", j.Config.AccessTokenExpires).Err(); err != nil {
-		j.Logger.Refresh(true,
+		j.Logger.Error(
 			"Failed to store JTI in redis",
 			fmt.Sprintf("Auth ID: %s", refreshData.Data.ID),
 			err.Error(),
@@ -214,7 +213,7 @@ func (j *JWTAuth) Refresh(r *http.Request, w http.ResponseWriter, refreshId stri
 		}
 	}
 
-	j.Logger.Refresh(false,
+	j.Logger.Info(
 		"Refreshed access token successfully",
 		fmt.Sprintf("user: %s", refreshData.Data.ID),
 	)

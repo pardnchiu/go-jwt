@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <title>WebSocket Test</title>
+  </head>
+
+  <body>
+    <h1>Hello {{.name}}</h1>
+    {{if .isAuth}}
+    <div id="msgList"></div>
+    <input type="text" id="msgInput" placeholder="Message" style="display: none;">
+    <button id="msgButton" style="display: none;">Send</button>
+    <button id="connectButton" data-connect="0">Connect Websocket</button>
+    <p>or U can <a href="/logout">Logout</button></p>
+
+    <script>
+      let ws;
+      document.addEventListener("DOMContentLoaded", _ => {
+        ws = connectWS();
+        document.getElementById("connectButton").dataset.connect = 1;
+        document.getElementById("connectButton").textContent = "Disconnect";
+
+        document.getElementById("msgInput").style.display = "inline-block";
+        document.getElementById("msgButton").style.display = "inline-block";
+
+        document.getElementById("connectButton").addEventListener("click", e => {
+          const connect = parseInt(e.target.dataset.connect);
+          if (connect === 0) {
+            ws = connectWS();
+            e.target.dataset.connect = 1;
+            e.target.textContent = "Disconnect";
+
+            document.getElementById("msgInput").style.display = "inline-block";
+            document.getElementById("msgButton").style.display = "inline-block";
+          } else {
+            e.target.dataset.connect = 0;
+            e.target.textContent = "Connect";
+            document.getElementById("msgInput").style.display = "none";
+            document.getElementById("msgButton").style.display = "none";
+            ws.close();
+          }
+        });
+
+        function connectWS() {
+          if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.close();
+          }
+
+          const newWs = new WebSocket("ws://localhost:8080/ws");
+          const msgList = document.getElementById("msgList");
+
+          newWs.onopen = function (event) {
+            addMessage("Connect to webSocket at " + new Date());
+          };
+
+          newWs.onmessage = function (event) {
+            const data = JSON.parse(event.data);
+            addMessage(data.user + ": " + data.message + " (" + data.time + ")");
+          };
+
+          newWs.onclose = function (event) {
+            addMessage("Close Connect");
+
+            const connectButton = document.getElementById("connectButton");
+            if (parseInt(connectButton.dataset.connect) === 1) {
+              addMessage("Attempting to reconnect...");
+              setTimeout(() => {
+                ws = connectWS();
+              }, 3000);
+            }
+          };
+
+          newWs.onerror = function (error) {
+            addMessage("Error: " + error);
+          };
+
+
+          function sendMessage() {
+            const input = document.getElementById("msgInput");
+
+            if (input.value) {
+              ws.send(JSON.stringify({ message: input.value }));
+              input.value = "msgInput";
+            }
+          }
+
+          function addMessage(message) {
+            const div = document.createElement("div");
+            div.textContent = message;
+            msgList.appendChild(div);
+          }
+
+          document.getElementById("msgButton").addEventListener("click", _ => {
+            sendMessage()
+            document.getElementById("msgInput").value = "";
+          });
+
+          return newWs;
+        }
+      })
+    </script>
+    {{end}}
+
+    {{if .isUnAuth}}
+    <p><a href="/login">Login</a> to connect WebSocket</p>
+    {{end}}
+
+
+    {{if .isLogin}}
+    <p>Your Token: {{.token}}</p>
+    <p id="timer">Will redirect in 3s</p>
+    <script>
+      let time = 0
+
+      setInterval(() => {
+        time += 1
+        document.getElementById("timer").innerText = `Will redirect in ${3 - time}s`;
+        if (time >= 3) {
+          window.location.href = "/";
+        }
+      }, 1000);
+    </script>
+    {{end}}
+
+    {{if .isLogout}}
+    {{if not .error}}
+    <p>Goodbye</p>
+    <p id="timer">Will redirect in 3s</p>
+    <script>
+      let time = 0
+
+      setInterval(() => {
+        time += 1
+        document.getElementById("timer").innerText = `Will redirect in ${3 - time}s`;
+        if (time >= 3) {
+          window.location.href = "/";
+        }
+      }, 1000);
+    </script>
+    {{else}}
+    <p>Error: {{.error}}</p>
+    <p id="timer">Will redirect in 3s</p>
+    <script>
+      let time = 0
+
+      setInterval(() => {
+        time += 1
+        document.getElementById("timer").innerText = `Will redirect in ${3 - time}s`;
+        if (time >= 3) {
+          window.location.href = "/";
+        }
+      }, 1000);
+    </script>
+    {{end}}
+    {{end}}
+
+  </body>
+
+</html>

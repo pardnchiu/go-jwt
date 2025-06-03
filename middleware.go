@@ -1,9 +1,8 @@
-package golangJwtAuth
+package goJwt
 
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -11,8 +10,7 @@ import (
 
 func (j *JWTAuth) GinMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		result := j.Verify(c.Request, c.Writer)
-		fmt.Println("CheckAuth:", result, result.Success)
+		result := j.Verify(c.Writer, c.Request)
 		if !result.Success {
 			c.JSON(result.StatusCode, gin.H{
 				"error": result.Error,
@@ -26,19 +24,19 @@ func (j *JWTAuth) GinMiddleware() gin.HandlerFunc {
 	}
 }
 
-func GetAuthDataFromGinContext(c *gin.Context) (*AuthData, bool) {
+func GetAuthDataFromGinContext(c *gin.Context) (*Auth, bool) {
 	user, exists := c.Get("user")
 	if !exists {
 		return nil, false
 	}
 
-	userData, ok := user.(*AuthData)
+	userData, ok := user.(*Auth)
 	return userData, ok
 }
 
 func (j *JWTAuth) HTTPMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		verify := j.Verify(r, w)
+		verify := j.Verify(w, r)
 
 		if !verify.Success {
 			w.Header().Set("Content-Type", "application/json")
@@ -54,12 +52,12 @@ func (j *JWTAuth) HTTPMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func GetAuthDataFromHTTPRequest(r *http.Request) (*AuthData, bool) {
+func GetAuthDataFromHTTPRequest(r *http.Request) (*Auth, bool) {
 	user := r.Context().Value("user")
 	if user == nil {
 		return nil, false
 	}
 
-	userData, ok := user.(*AuthData)
+	userData, ok := user.(*Auth)
 	return userData, ok
 }

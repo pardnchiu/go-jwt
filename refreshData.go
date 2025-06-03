@@ -1,12 +1,12 @@
-package golangJwtAuth
+package goJwt
 
 import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 )
 
-// * private method
 func getStr(data map[string]interface{}, key string) string {
 	v, exists := data[key]
 	if !exists || v == nil {
@@ -27,7 +27,6 @@ func getStr(data map[string]interface{}, key string) string {
 	}
 }
 
-// * private method
 func getInt(data map[string]interface{}, key string) int {
 	v, exists := data[key]
 	if !exists || v == nil {
@@ -46,7 +45,6 @@ func getInt(data map[string]interface{}, key string) int {
 	}
 }
 
-// * private method
 func getScope(data map[string]interface{}, key string) []string {
 	v, exists := data[key]
 	if !exists || v == nil {
@@ -69,46 +67,39 @@ func getScope(data map[string]interface{}, key string) []string {
 	}
 }
 
-// * private method
-func (j *JWTAuth) getRefreshId(r *http.Request) string {
-	if refreshId := r.Header.Get("X-Refresh-ID"); refreshId != "" {
+func (j *JWTAuth) getRefreshID(r *http.Request) string {
+	if refreshId := r.Header.Get(headerKeyRefreshID); refreshId != "" {
 		return refreshId
 	}
-	if cookie, err := r.Cookie(j.Config.RefreshIdCookieKey); err == nil {
+
+	if cookie, err := r.Cookie(j.config.Option.RefreshIdCookieKey); err == nil {
 		return cookie.Value
 	}
+
 	return ""
 }
 
-// * private method
-func (j *JWTAuth) getRefreshData(refreshId string, fp string) (*RefreshData, error) {
-	refreshDataJson, err := j.Redis.Get(j.Context, "refresh:"+refreshId).Result()
+func (j *JWTAuth) getRefreshData(refreshID string, fp string) (*RefreshData, time.Duration, error) {
+	key := fmt.Sprintf(redisKeyRefreshID, refreshID)
+
+	result, err := j.redis.Get(j.context, key).Result()
 	if err != nil {
-		return nil, err
+		return nil, 0, err
+	}
+
+	ttl, err := j.redis.TTL(j.context, key).Result()
+	if err != nil || ttl < 1 {
+		return nil, 0, err
 	}
 
 	var refreshData RefreshData
-
-	if err := json.Unmarshal([]byte(refreshDataJson), &refreshData); err != nil {
-		return nil, fmt.Errorf("failed to parse json: %w", err)
+	if err := json.Unmarshal([]byte(result), &refreshData); err != nil {
+		return nil, 0, err
 	}
 
 	if refreshData.Fingerprint != fp {
-		return nil, fmt.Errorf("fingerprint invalid")
+		return nil, 0, fmt.Errorf("Fingerprint mismatch: expected %s, got %s", refreshData.Fingerprint, fp)
 	}
 
-	return &refreshData, nil
-}
-
-// * private method
-func (j *JWTAuth) getUserData(data map[string]interface{}) AuthData {
-	return AuthData{
-		ID:        getStr(data, "id"),
-		Name:      getStr(data, "name"),
-		Email:     getStr(data, "email"),
-		Thumbnail: getStr(data, "thumbnail"),
-		Role:      getStr(data, "role"),
-		Level:     getInt(data, "level"),
-		Scope:     getScope(data, "scope"),
-	}
+	return &refreshData, ttl, nil
 }

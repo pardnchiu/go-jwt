@@ -3,118 +3,172 @@ package main
 import (
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	golangJwtAuth "github.com/pardnchiu/golang-jwt-auth"
+	"github.com/gorilla/websocket"
+	goJwt "github.com/pardnchiu/go-jwt"
 )
 
+var websocketUpgrade = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
+}
+
 func main() {
-	config := &golangJwtAuth.Config{
-		// 使用 ECDSA 演算法
-		// P***Path: 塞入公鑰與私鑰的路徑
-		// P***: 塞入公鑰與私鑰的內容
-		PrivateKeyPath: "./keys/private-key.pem",
-		PublicKeyPath:  "./keys/public-key.pem",
-		// PrivateKey: "",
-		// PublicKey:  "",
-		// Redis 設定
-		Redis: golangJwtAuth.RedisConfig{
+	config := goJwt.Config{
+		Redis: goJwt.Redis{
 			Host:     "localhost",
 			Port:     6379,
 			Password: "0123456789",
 			DB:       0,
 		},
-		// 自訂 Cookie 欄位名稱
-		AccessTokenCookieKey: "access_token",
-		RefreshIdCookieKey:   "refresh_id",
-		// 自訂 Token 失效時間
-		AccessTokenExpires: 1 * time.Minute,
-		RefreshIdExpires:   7 * 24 * time.Hour,
-		// 生產環境: Domain = Domain, SameSite = None, Secure = true
-		// 測試環境: Domain = "localhost", SameSite = Lax, Secure = false
-		IsProd:    false,
-		Domain:    "pardn.io",
-		LogStdout: false,
-		// 用於 refresh token 時判斷資料庫中會員是否存在來決定是否重簽
-		// 回傳 false 則會取消重簽清除 token
-		CheckUserExists: func(userData golangJwtAuth.AuthData) (bool, error) {
+		CheckAuth: func(userData goJwt.Auth) (bool, error) {
 			return userData.ID == "1", nil
 		},
 	}
 
-	auth, err := golangJwtAuth.New(config)
+	auth, err := goJwt.New(config)
 	if err != nil {
 		log.Fatal("failed to init:", err)
 	}
 	defer auth.Close()
 
 	r := gin.Default()
+	r.LoadHTMLGlob("./model/*")
 
 	r.GET("/", func(c *gin.Context) {
-		check := auth.Verify(c.Request, c.Writer)
+		check := auth.Verify(c.Writer, c.Request)
+		c.Header("Content-Type", "text/html")
 		if check.Success {
-			c.JSON(http.StatusOK, gin.H{
-				"message": "hello " + check.Data.Name,
+			c.HTML(http.StatusOK, "index.html", gin.H{
+				"name":   check.Data.Name,
+				"isAuth": true,
 			})
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{
-			"message": "hello world",
+		c.HTML(http.StatusOK, "index.html", gin.H{
+			"name":     "Guest",
+			"isUnAuth": true,
 		})
 	})
 
 	r.GET("/login", func(c *gin.Context) {
-		check := auth.Verify(c.Request, c.Writer)
+		check := auth.Verify(c.Writer, c.Request)
 		if check.Success {
 			c.Redirect(http.StatusFound, "/")
 			return
 		}
 
-		user := &golangJwtAuth.AuthData{
+		user := &goJwt.Auth{
 			ID:    "1",
 			Name:  "John",
 			Email: "john@example.com",
 			Scope: []string{"read", "write"},
 		}
 
-		result, err := auth.Create(c.Request, c.Writer, user)
-		if err != nil {
+		c.Header("Content-Type", "text/html")
+
+		result := auth.Create(c.Writer, c.Request, user)
+		if !result.Success {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to login"})
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{
-			"message": "successful",
+		c.HTML(http.StatusOK, "index.html", gin.H{
+			"name":    user.Name,
 			"token":   result.Token,
+			"isLogin": true,
 		})
 	})
 
 	r.GET("/logout", func(c *gin.Context) {
-		check := auth.Verify(c.Request, c.Writer)
+		c.Header("Content-Type", "text/html")
+
+		check := auth.Verify(c.Writer, c.Request)
 		if !check.Success {
-			c.JSON(http.StatusOK, gin.H{
-				"message": "please login first",
+			c.HTML(http.StatusOK, "index.html", gin.H{
+				"error":    "please login first",
+				"isLogout": true,
 			})
 			return
 		}
 
-		auth.Revoke(c.Request, c.Writer)
-		c.JSON(http.StatusOK, gin.H{
-			"message": "logout successful",
+		result := auth.Revoke(c.Writer, c.Request)
+		if !result.Success {
+			c.HTML(http.StatusOK, "index.html", gin.H{
+				"error":    result.Error,
+				"isLogout": true,
+			})
+			return
+		}
+
+		c.HTML(http.StatusOK, "index.html", gin.H{
+			"isLogout": true,
 		})
 	})
 
-	// 直接使用中間件阻擋範例
+	r.GET("/ws", handleWebSocket(auth))
+
 	protected := r.Group("/protected")
 	protected.Use(auth.GinMiddleware())
 	{
 		protected.GET("/user", func(c *gin.Context) {
-			user, _ := golangJwtAuth.GetAuthDataFromGinContext(c)
+			user, _ := goJwt.GetAuthDataFromGinContext(c)
 			c.JSON(http.StatusOK, gin.H{"user": user})
 		})
 	}
 
 	r.Run(":8080")
+}
+
+func handleWebSocket(auth *goJwt.JWTAuth) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		check := auth.Verify(c.Writer, c.Request)
+		if !check.Success {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+			return
+		}
+
+		conn, err := websocketUpgrade.Upgrade(c.Writer, c.Request, nil)
+		if err != nil {
+			log.Printf("WebSocket upgrade failed: %v", err)
+			return
+		}
+		defer conn.Close()
+
+		welcomeMsg := map[string]interface{}{
+			"time":    time.Now(),
+			"user":    "System",
+			"message": "Welcome",
+		}
+		conn.WriteJSON(welcomeMsg)
+
+		count := 0
+		for {
+			var msg map[string]interface{}
+			err := conn.ReadJSON(&msg)
+			if err != nil {
+				log.Printf("WebSocket read error: %v", err)
+				break
+			}
+
+			count++
+			response := map[string]interface{}{
+				"time":    time.Now(),
+				"user":    check.Data.Name,
+				"message": msg["message"].(string),
+			}
+			conn.WriteJSON(response)
+			welcomeMsg1 := map[string]interface{}{
+				"time":    time.Now(),
+				"user":    "System",
+				"message": "Received your message: " + strconv.Itoa(count),
+			}
+			conn.WriteJSON(welcomeMsg1)
+		}
+	}
 }

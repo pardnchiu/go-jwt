@@ -1,88 +1,100 @@
-# JWT 身份驗證 (Golang)
+# JWT Authentication
 
-> 一個提供存取權杖和更新權杖機制的 JWT 身份驗證套件，具備指紋識別、Redis 儲存和自動更新功能。<br>
-> Node.js 版本可在[此處](https://github.com/pardnchiu/node-jwt-auth)找到
+> 一個提供存取權杖和更新權杖的 Golang JWT 身份驗證套件，具備指紋識別、Redis 儲存和自動更新功能。<br>
+> A Golang JWT authentication package providing access tokens and refresh tokens with fingerprinting, Redis storage, and automatic refresh capabilities.<br>
+>
+> Node.js version [here](https://github.com/pardnchiu/node-jwt-auth)
 
-[![license](https://img.shields.io/github/license/pardnchiu/go-jwt-auth)](https://github.com/pardnchiu/go-jwt-auth/blob/main/LICENSE)
-[![version](https://img.shields.io/github/v/tag/pardnchiu/go-jwt-auth)](https://github.com/pardnchiu/go-jwt-auth/releases)
-[![readme](https://img.shields.io/badge/readme-English-blue)](https://github.com/pardnchiu/go-jwt-auth/blob/main/README.md) 
+![](https://img.shields.io/github/languages/top/pardnchiu/go-jwt)
+[![license](https://img.shields.io/github/license/pardnchiu/go-jwt)](LICENSE)
+[![version](https://img.shields.io/github/v/tag/pardnchiu/go-jwt)](https://github.com/pardnchiu/go-jwt/releases)
 
 ## 三大主軸
 
-- **雙權杖系統**：Access Token 搭配 Refresh ID 具備自動更新機制
-- **裝置指紋識別**：基於 `User-Agent`、`Device ID`、作業系統和瀏覽器生成唯一指紋，防止權杖在不同裝置間濫用
-- **安全防護**：權杖撤銷、版本控制、智能更新，以及使用 Redis 鎖定機制的併發保護
+### 雙權杖系統 / Dual Token
+Access Token 搭配 Refresh ID，並具備自動更新機制<br>
+Access Token paired with Refresh ID, and provide automatic refresh mechanism
 
-## 流程圖
+### 裝置指紋識別 / Fingerprint Verify
+基於 `User-Agent`、`Device ID`、作業系統和瀏覽器生成唯一指紋，防止權杖在不同裝置間濫用<br>
+Generates unique fingerprint based on `User-Agent`, `Device ID`, operating system, and browser to prevent token abuse across different devices
+
+### 安全防護 / Security Protection
+權杖撤銷、版本控制、智能更新，以及使用 Redis 鎖定機制的併發保護<br>
+Token revocation, version control, intelligent refresh, and concurrency protection using Redis locking mechanism
+
+## 流程圖 / Flow
 
 <details>
 <summary>點擊顯示</summary>
 
 ```mermaid
 flowchart TD
-  Start([請求開始]) --> Auth{有存取權杖？}
-  Auth -->|是| CheckRevoke[檢查權杖是否已撤銷]
-  Auth -->|否| HasRefresh{有更新 ID？}
-  HasRefresh -->|否| Unauthorized[返回 401 未授權]
-  HasRefresh -->|是| ValidateRefresh[驗證更新 ID]
-  CheckRevoke --> IsRevoked{權杖已撤銷？}
-  IsRevoked -->|是| Unauthorized
-  IsRevoked -->|否| ParseToken[解析存取權杖]
-  ParseToken --> TokenValid{權杖有效？}
-  TokenValid -->|是| ValidateClaims[驗證聲明]
-  TokenValid -->|否| IsExpired{權杖過期？}
-  IsExpired -->|是| ParseExpiredToken[解析過期權杖]
-  IsExpired -->|否| InvalidToken[返回 400 無效權杖]
-  ParseExpiredToken --> ValidateExpiredClaims[驗證過期權杖聲明]
-  ValidateExpiredClaims --> ExpiredClaimsValid{更新 ID 和指紋匹配？}
-  ExpiredClaimsValid -->|否| InvalidClaims[返回 400 無效聲明]
-  ExpiredClaimsValid -->|是| RefreshFlow[進入更新流程]
-  ValidateClaims --> ClaimsValid{聲明匹配？}
-  ClaimsValid -->|否| InvalidClaims
-  ClaimsValid -->|是| CheckJTI[檢查 JTI]
-  CheckJTI --> JTIValid{JTI 有效？}
-  JTIValid -->|否| Unauthorized
-  JTIValid -->|是| Success[返回 200 成功]
-  ValidateRefresh --> RefreshValid{更新 ID 有效？}
-  RefreshValid -->|否| Unauthorized
-  RefreshValid -->|是| RefreshFlow
-  RefreshFlow --> AcquireLock[獲取更新鎖定]
-  AcquireLock --> LockSuccess{鎖定成功？}
-  LockSuccess -->|否| TooManyRequests[返回 429 請求過多]
-  LockSuccess -->|是| GetRefreshData[獲取更新資料]
-  GetRefreshData --> CheckTTL[檢查 TTL]
-  CheckTTL --> NeedNewRefresh{需要新的更新 ID？}
-  NeedNewRefresh -->|是| CreateNewRefresh[建立新的更新 ID]
-  NeedNewRefresh -->|否| UpdateVersion[更新版本號碼]
-  CreateNewRefresh --> SetOldRefreshExpire[將舊的更新 ID 設定為 5 秒後過期]
-  SetOldRefreshExpire --> SetNewRefreshData[設定新的更新資料]
+  Start([Request Start]) --> Auth{Has Access Token?}
+  Auth -->|Yes| CheckRevoke[Check if token is revoked]
+  Auth -->|No| HasRefresh{Has Refresh ID?}
+  HasRefresh -->|No| Unauthorized[Return 401 Unauthorized]
+  HasRefresh -->|Yes| ValidateRefresh[Validate Refresh ID]
+  CheckRevoke --> IsRevoked{Token revoked?}
+  IsRevoked -->|Yes| Unauthorized
+  IsRevoked -->|No| ParseToken[Parse access token]
+  ParseToken --> TokenValid{Token valid?}
+  TokenValid -->|Yes| ValidateClaims[Validate claims]
+  TokenValid -->|No| IsExpired{Token expired?}
+  IsExpired -->|Yes| ParseExpiredToken[Parse expired token]
+  IsExpired -->|No| InvalidToken[Return 400 Invalid Token]
+  ParseExpiredToken --> ValidateExpiredClaims[Validate expired token claims]
+  ValidateExpiredClaims --> ExpiredClaimsValid{Refresh ID and fingerprint match?}
+  ExpiredClaimsValid -->|No| InvalidClaims[Return 400 Invalid Claims]
+  ExpiredClaimsValid -->|Yes| RefreshFlow[Enter refresh flow]
+  ValidateClaims --> ClaimsValid{Claims match?}
+  ClaimsValid -->|No| InvalidClaims
+  ClaimsValid -->|Yes| CheckJTI[Check JTI]
+  CheckJTI --> JTIValid{JTI valid?}
+  JTIValid -->|No| Unauthorized
+  JTIValid -->|Yes| Success[Return 200 Success]
+  ValidateRefresh --> RefreshValid{Refresh ID valid?}
+  RefreshValid -->|No| Unauthorized
+  RefreshValid -->|Yes| RefreshFlow
+  RefreshFlow --> AcquireLock[Acquire refresh lock]
+  AcquireLock --> LockSuccess{Lock acquired?}
+  LockSuccess -->|No| TooManyRequests[Return 429 Too Many Requests]
+  LockSuccess -->|Yes| GetRefreshData[Get refresh data]
+  GetRefreshData --> CheckTTL[Check TTL]
+  CheckTTL --> NeedNewRefresh{Need new Refresh ID?}
+  NeedNewRefresh -->|Yes| CreateNewRefresh[Create new Refresh ID]
+  NeedNewRefresh -->|No| UpdateVersion[Update version number]
+  CreateNewRefresh --> SetOldRefreshExpire[Set old Refresh ID to expire in 5 seconds]
+  SetOldRefreshExpire --> SetNewRefreshData[Set new refresh data]
   UpdateVersion --> SetNewRefreshData
-  SetNewRefreshData --> CheckUserExists{檢查用戶是否存在}
-  CheckUserExists -->|否| Unauthorized
-  CheckUserExists -->|是| GenerateNewToken[生成新的存取權杖]
-  GenerateNewToken --> StoreJTI[儲存新的 JTI]
-  StoreJTI --> SetCookies[設定 Cookies]
-  SetCookies --> ReleaseLock[釋放鎖定]
-  ReleaseLock --> RefreshSuccess[返回更新成功]
+  SetNewRefreshData --> CheckUserExists{Check if user exists}
+  CheckUserExists -->|No| Unauthorized
+  CheckUserExists -->|Yes| GenerateNewToken[Generate new access token]
+  GenerateNewToken --> StoreJTI[Store new JTI]
+  StoreJTI --> SetCookies[Set Cookies]
+  SetCookies --> ReleaseLock[Release lock]
+  ReleaseLock --> RefreshSuccess[Return refresh success]
 ```
 
 </details>
 
-## 相依套件
+## 依賴套件 / Dependencies
 
 - [`github.com/gin-gonic/gin`](https://github.com/gin-gonic/gin)
 - [`github.com/golang-jwt/jwt/v5`](https://github.com/golang-jwt/jwt/v5)
 - [`github.com/redis/go-redis/v9`](https://github.com/redis/go-redis/v9)
-- [`github.com/pardnchiu/go-logger`](https://github.com/pardnchiu/go-logger)
+- [`github.com/pardnchiu/go-logger`](https://github.com/pardnchiu/go-logger)<br>
+  如果你不需要，你可以 fork 然後使用你熟悉的取代。更可以到[這裡](https://forms.gle/EvNLwzpHfxWR2gmP6)進行投票讓我知道。<br>
+  If you don't need this, you can fork the project and replace it. You can also vote [here](https://forms.gle/EvNLwzpHfxWR2gmP6) to let me know your thought.
 
-## 使用方法
+## 使用方法 / How to use
 
-### 安裝
+### 安裝 / Installation
 ```bash
-go get github.com/pardnchiu/go-jwt-auth
+go get github.com/pardnchiu/go-jwt
 ```
 
-### 初始化
+### 初始化 / Initialization
 ```go
 package main
 
@@ -91,36 +103,35 @@ import (
   "net/http"
   
   "github.com/gin-gonic/gin"
-  jwtAuth "github.com/pardnchiu/go-jwt-auth"
+  goJwt "github.com/pardnchiu/go-jwt"
 )
 
 func main() {
-  // 最小配置 - 金鑰將自動生成
-  config := jwtAuth.Config{
-    Redis: jwtAuth.Redis{
+  config := goJwt.Config{
+    Redis: goJwt.Redis{
       Host:     "localhost",
       Port:     6379,
       Password: "password",
       DB:       0,
     },
-    CheckAuth: func(userData jwtAuth.Auth) (bool, error) {
-      // 自定義用戶驗證邏輯
+    CheckAuth: func(userData goJwt.Auth) (bool, error) {
+      // Custom user validation logic
       return userData.ID != "", nil
     },
   }
 
-  auth, err := jwtAuth.New(config)
+  auth, err := goJwt.New(config)
   if err != nil {
-    log.Fatal("初始化失敗:", err)
+    log.Fatal("Initialization failed:", err)
   }
   defer auth.Close()
 
   r := gin.Default()
 
-  // 登入端點
+  // Login endpoint
   r.POST("/login", func(c *gin.Context) {
-    // 驗證登入憑證後...
-    user := &jwtAuth.Auth{
+    // After validating login credentials...
+    user := &goJwt.Auth{
       ID:    "user123",
       Name:  "John Doe",
       Email: "john@example.com",
@@ -140,17 +151,17 @@ func main() {
     })
   })
 
-  // 受保護的路由
+  // Protected routes
   protected := r.Group("/api")
   protected.Use(auth.GinMiddleware())
   {
     protected.GET("/profile", func(c *gin.Context) {
-      user, _ := jwtAuth.GetAuthDataFromGinContext(c)
+      user, _ := goJwt.GetAuthDataFromGinContext(c)
       c.JSON(http.StatusOK, gin.H{"user": user})
     })
   }
 
-  // 登出端點
+  // Logout
   r.POST("/logout", func(c *gin.Context) {
     result := auth.Revoke(c.Writer, c.Request)
     if !result.Success {
@@ -164,212 +175,181 @@ func main() {
 }
 ```
 
-### 配置詳細說明
-
+### 配置說明 / Configuration
 ```go
 type Config struct {
-  Redis     Redis                    // Redis 配置（必要）
-  File      *File                    // 金鑰管理的檔案配置（可選）
-  Log       *Log                     // 日誌配置（可選）
-  Option    *Option                  // 系統參數和權杖設定（可選）
-  Cookie    *Cookie                  // Cookie 安全設定（可選）
-  CheckAuth func(Auth) (bool, error) // 用戶身份驗證函數（可選）
+  Redis     Redis                    // Redis configuration (required)
+  File      *File                    // File configuration for key management (optional)
+  Log       *Log                     // Logging configuration (optional)
+  Option    *Option                  // System parameters and token settings (optional)
+  Cookie    *Cookie                  // Cookie security settings (optional)
+  CheckAuth func(Auth) (bool, error) // User authentication function (optional)
 }
 
 type Redis struct {
-  Host     string // Redis 伺服器主機位址（必要）
-  Port     int    // Redis 伺服器連接埠號（必要）
-  Password string // Redis 認證密碼（可選，空字串表示無認證）
-  DB       int    // Redis 資料庫索引（必要，通常為 0-15）
+  Host     string // Redis server host address (required)
+  Port     int    // Redis server port number (required)
+  Password string // Redis authentication password (optional, empty string means no auth)
+  DB       int    // Redis database index (required, usually 0-15)
 }
 
 type File struct {
-  PrivateKeyPath string // JWT 簽署用的 ECDSA 私鑰檔案路徑
-  PublicKeyPath  string // JWT 驗證用的 ECDSA 公鑰檔案路徑
+  PrivateKeyPath string // ECDSA private key file path for JWT signing
+  PublicKeyPath  string // ECDSA public key file path for JWT verification
 }
 
 type Log struct {
-  Path      string // 日誌目錄路徑（預設：./logs/jwtAuth）
-  Stdout    bool   // 啟用控制台輸出日誌（預設：false）
-  MaxSize   int64  // 日誌檔案輪替前的最大大小（位元組）（預設：16MB）
-  MaxBackup int    // 保留的輪替日誌檔案數量（預設：5）
-  Type      string // 輸出格式："json" 為 slog 標準，"text" 為樹狀格式（預設："text"）
+  Path      string // Log directory path (default: ./logs/jwtAuth)
+  Stdout    bool   // Enable console log output (default: false)
+  MaxSize   int64  // Maximum size before log file rotation (bytes) (default: 16MB)
+  MaxBackup int    // Number of rotated log files to retain (default: 5)
+  Type      string // Output format: "json" for slog standard, "text" for tree format (default: "text")
 }
 
 type Option struct {
-  PrivateKey           string        // ECDSA 私鑰內容（若未提供則自動生成 P-256）
-  PublicKey            string        // ECDSA 公鑰內容（若未提供則自動生成 P-256）
-  AccessTokenExpires   time.Duration // 存取權杖過期時間（預設：15 分鐘）
-  RefreshIdExpires     time.Duration // 更新 ID 過期時間（預設：7 天）
-  AccessTokenCookieKey string        // 存取權杖 Cookie 名稱（預設："access_token"）
-  RefreshIdCookieKey   string        // 更新 ID Cookie 名稱（預設："refresh_id"）
-  MaxVersion           int           // 更新權杖最大版本數（預設：5）
-  RefreshTTL           float64       // 更新閾值佔 TTL 的比例（預設：0.5）
+  PrivateKey           string        // ECDSA private key content (auto-generates P-256 if not provided)
+  PublicKey            string        // ECDSA public key content (auto-generates P-256 if not provided)
+  AccessTokenExpires   time.Duration // Access token expiration time (default: 15 minutes)
+  RefreshIdExpires     time.Duration // Refresh ID expiration time (default: 7 days)
+  AccessTokenCookieKey string        // Access token cookie name (default: "access_token")
+  RefreshIdCookieKey   string        // Refresh ID cookie name (default: "refresh_id")
+  MaxVersion           int           // Maximum version count for refresh tokens (default: 5)
+  RefreshTTL           float64       // Refresh threshold as proportion of TTL (default: 0.5)
 }
 
 type Cookie struct {
-  Domain   *string        // Cookie 網域範圍（nil 表示目前網域）
-  Path     *string        // Cookie 路徑範圍（預設："/"）
-  SameSite *http.SameSite // Cookie SameSite 政策（預設：Lax 以防 CSRF）
-  Secure   *bool          // Cookie 安全標誌，僅限 HTTPS（預設：false）
-  HttpOnly *bool          // Cookie HttpOnly 標誌以防 XSS（預設：true）
+  Domain   *string        // Cookie domain scope (nil means current domain)
+  Path     *string        // Cookie path scope (default: "/")
+  SameSite *http.SameSite // Cookie SameSite policy (default: Lax for CSRF prevention)
+  Secure   *bool          // Cookie secure flag, HTTPS only (default: false)
+  HttpOnly *bool          // Cookie HttpOnly flag for XSS prevention (default: true)
 }
 ```
 
-## 支援的操作
+## 可用函式 / Functions
 
-### 核心方法
+### 實例管理 / Instance Management
+
+- `New()` - 建立新的實例 / Create a new instance
+  ```go
+  auth, err := goJwt.New(config)
+  ```
+  - 初始化 Redis 連線<br>
+    Initialize Redis connection
+  - 設定日誌系統<br>
+    Setup logging system
+  - 若未提供則自動生成 ECDSA 金鑰<br>
+    Auto-generate ECDSA keys if not provided
+  - 驗證配置<br>
+    Validate configuration
+
+- `Close()` - 關閉實例 / Close instance
+  ```go
+  err := auth.Close()
+  ```
+  - 關閉 Redis 連線<br>
+    Close Redis connection
+  - 釋放系統資源<br>
+    Release system resources
+
+### JWT 管理 / JWT Management
+
+- `Create()` - 生成新的 JWT / Generate a new JWT
+  ```go
+  result := auth.Create(w, r, userData)
+  ```
+  - 生成存取權杖和更新 ID<br>
+    Generate access token and refresh ID
+  - 設定安全 cookies<br>
+    Set secure cookies
+  - 在 Redis 中儲存會話資料<br>
+    Store session data in Redis
+
+- `Verify()` - 驗證 JWT / Verify JWT
+  ```go
+  result := auth.Verify(w, r)
+  ```
+  - 解析和驗證 JWT 權杖<br>
+    Parse and validate JWT tokens
+  - 檢查裝置指紋<br>
+    Check device fingerprint
+  - 如需要則自動更新<br>
+    Auto-refresh if needed
+  - 返回用戶資料<br>
+    Return user data
+
+- `Revoke()` - 終止 JWT / Revoke JWT
+  ```go
+  result := auth.Revoke(w, r)
+  ```
+  - 清除 cookies<br>
+    Clear cookies
+  - 將權杖加入黑名單<br>
+    Blacklist tokens
+  - 更新 Redis 記錄<br>
+    Update Redis records
+
+### 中間件 / Middleware
 
 ```go
-// 建立新的身份驗證會話
-result := auth.Create(w, r, userData)
-
-// 驗證身份驗證狀態
-result := auth.Verify(w, r)
-
-// 撤銷身份驗證（登出）
-result := auth.Revoke(w, r)
-```
-
-### 中介軟體使用
-
-```go
-// Gin 框架中介軟體
+// Gin framework middleware
 protected.Use(auth.GinMiddleware())
 
-// 標準 HTTP 中介軟體
+// Standard HTTP middleware
 server := &http.Server{
   Handler: auth.HTTPMiddleware(handler),
 }
 
-// 從上下文獲取用戶資料
-user, exists := jwtAuth.GetAuthDataFromGinContext(c)
-user, exists := jwtAuth.GetAuthDataFromHTTPRequest(r)
+// Get user data from context
+user, exists := goJwt.GetAuthDataFromGinContext(c)
+user, exists := goJwt.GetAuthDataFromHTTPRequest(r)
 ```
 
-### 驗證方法
+### 支持多種驗證方法 / Support Multiple Methods
 
-```go
-// 支援多種驗證方法：
-// 1. 自定義標頭
+#### 自定義標頭 / Custom headers
+```
 r.Header.Set("X-Device-FP", fingerprint)
 r.Header.Set("X-Refresh-ID", refreshID)
 r.Header.Set("Authorization", "Bearer "+token)
-
-// 2. Cookies（自動管理）
-// access_token、refresh_id cookies
-
-// 3. 裝置指紋識別（自動）
-// 基於用戶代理、裝置 ID、作業系統、瀏覽器
 ```
 
-## 核心功能
+#### Cookies 自動管理 / automatically managed
+```
+access_token、refresh_id cookies
+```
 
-### 連線管理
-
-- **New** - 建立新的 JWT 身份驗證實例
-  ```go
-  auth, err := jwtAuth.New(config)
-  ```
-  - 初始化 Redis 連線
-  - 設定日誌系統
-  - 若未提供則自動生成 ECDSA 金鑰
-  - 驗證配置
-
-- **Close** - 關閉 JWT 身份驗證實例
-  ```go
-  err := auth.Close()
-  ```
-  - 關閉 Redis 連線
-  - 釋放系統資源
-
-### 安全功能
-
-- **裝置指紋識別** - 基於用戶代理、裝置 ID、作業系統、瀏覽器和裝置類型生成唯一指紋
-  ```go
-  fingerprint := auth.getFingerprint(w, r)
-  ```
-
-- **權杖撤銷** - 在登出時將權杖加入黑名單
-  ```go
-  result := auth.Revoke(w, r)
-  ```
-
-- **自動更新** - 基於過期時間和版本控制的智能權杖更新
-  ```go
-  // 在需要時於 Verify() 期間自動觸發
-  result := auth.Verify(w, r)
-  ```
-
-### 身份驗證流程
-
-- **Create** - 生成新的身份驗證會話
-  ```go
-  result := auth.Create(w, r, userData)
-  ```
-  - 生成存取權杖和更新 ID
-  - 設定安全 cookies
-  - 在 Redis 中儲存會話資料
-
-- **Verify** - 驗證身份驗證狀態
-  ```go
-  result := auth.Verify(w, r)
-  ```
-  - 解析和驗證 JWT 權杖
-  - 檢查裝置指紋
-  - 如需要則自動更新
-  - 返回用戶資料
-
-- **Revoke** - 終止身份驗證會話
-  ```go
-  result := auth.Revoke(w, r)
-  ```
-  - 清除 cookies
-  - 將權杖加入黑名單
-  - 更新 Redis 記錄
-
-## 安全功能
-
-- **裝置指紋識別**：基於用戶代理、裝置 ID、作業系統、瀏覽器和裝置類型生成唯一指紋，具備持久追蹤功能
-- **權杖撤銷**：在登出時將權杖加入黑名單
-- **自動過期**：支援過期權杖的 TTL 自動清理
-- **版本控制**：追蹤更新權杖版本以防止重放攻擊
-- **指紋驗證**：確保權杖只能在相同裝置/瀏覽器上使用
-- **自動金鑰生成**：若未提供則自動生成安全的 ECDSA 金鑰對
-- **併發保護**：Redis 鎖定機制防止併發更新衝突
-
-## 錯誤處理
-
-所有方法都返回 [`JWTAuthResult`](type.go) 結構：
-
+## 錯誤處理 / Error Handling
+> 所有方法都返回 [`JWTAuthResult`](type.go) 結構<br>
+> All methods return a [`JWTAuthResult`](type.go) structure
 ```go
 type JWTAuthResult struct {
-  StatusCode int          // HTTP 狀態碼
-  Success    bool         // 操作是否成功
-  Data       *Auth        // 用戶資料
-  Token      *TokenResult // 權杖資訊
-  Error      string       // 錯誤訊息
-  ErrorTag   string       // 錯誤分類標籤
+  StatusCode int          // HTTP status code
+  Success    bool         // Whether operation succeeded
+  Data       *Auth        // User data
+  Token      *TokenResult // Token information
+  Error      string       // Error message
+  ErrorTag   string       // Error category tag
 }
 ```
 
-### 錯誤標籤
+### 錯誤標籤 / Error Tags
+- `data_missing` - 缺少必要資料 / Missing required data
+- `data_invalid` - 無效的資料格式 / Invalid data format
+- `unauthorized` - 身份驗證失敗 / Authentication failed
+- `revoked` - 權杖已被撤銷 / Token has been revoked
+- `failed_to_update` - 更新操作失敗 / Update operation failed
+- `failed_to_create` - 建立操作失敗 / Create operation failed
+- `failed_to_sign` - 權杖簽署失敗 / Token signing failed
+- `failed_to_store` - 儲存操作失敗 / Storage operation failed
+- `failed_to_get` - 取得操作失敗 / Get operation failed
 
-- `data_missing` - 缺少必要資料
-- `data_invalid` - 無效的資料格式
-- `unauthorized` - 身份驗證失敗
-- `revoked` - 權杖已被撤銷
-- `failed_to_update` - 更新操作失敗
-- `failed_to_create` - 建立操作失敗
-- `failed_to_sign` - 權杖簽署失敗
-- `failed_to_store` - 儲存操作失敗
-- `failed_to_get` - 取得操作失敗
+## 授權條款 / License
 
-## 授權條款
+此原始碼專案採用 [MIT](LICENSE) 授權條款。<br>
+This source code project is licensed under the [MIT](LICENSE) license.
 
-此原始碼專案採用 [MIT](https://github.com/pardnchiu/go-jwt-auth/blob/main/LICENSE) 授權條款。
-
-## 作者
+## 作者 / Author
 
 <img src="https://avatars.githubusercontent.com/u/25631760" align="left" width="96" height="96" style="margin-right: 0.5rem;">
 

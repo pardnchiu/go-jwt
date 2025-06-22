@@ -1,4 +1,4 @@
-package jwtAuth
+package goJwt
 
 import (
 	"context"
@@ -6,12 +6,12 @@ import (
 	"net/http"
 	"time"
 
-	goLogger "github.com/pardnchiu/go-logger"
+	"github.com/pardnchiu/go-logger"
 	"github.com/redis/go-redis/v9"
 )
 
 const (
-	defaultLogPath        = "./logs/jwtAuth"
+	defaultLogPath        = "./logs/jwt"
 	defaultLogMaxSize     = 16 * 1024 * 1024
 	defaultLogMaxBackup   = 5
 	defaultPrivateKeyPath = "./keys/private-key.pem"
@@ -49,8 +49,8 @@ const (
 )
 
 // * 繼承至 pardnchiu/go-logger
-type Log = goLogger.Log
-type Logger = goLogger.Logger
+type Log = logger.Log
+type Logger = logger.Logger
 
 type Config struct {
 	Redis     Redis                    `json:"redis"`               // Redis 設定

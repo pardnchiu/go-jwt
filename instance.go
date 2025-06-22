@@ -1,11 +1,11 @@
-package jwtAuth
+package goJwt
 
 import (
 	"context"
 	"fmt"
 	"time"
 
-	goLogger "github.com/pardnchiu/go-logger"
+	"github.com/pardnchiu/go-logger"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -13,7 +13,7 @@ func New(c Config) (*JWTAuth, error) {
 	c.Log = validLoggerConfig(c)
 	c.Option = validOptionData(c)
 
-	logger, err := goLogger.New(c.Log)
+	logger, err := logger.New(c.Log)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to initialize `pardnchiu/go-logger`: %w", err)
 	}

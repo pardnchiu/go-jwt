@@ -1,4 +1,4 @@
-package jwtAuth
+package goJwt
 
 import (
 	"context"

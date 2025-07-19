@@ -3,28 +3,44 @@ package goJwt
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"log/syslog"
+	"os"
 	"time"
 
-	"github.com/pardnchiu/go-logger"
+	// "github.com/pardnchiu/go-logger"
 	"github.com/redis/go-redis/v9"
 )
 
 func New(c Config) (*JWTAuth, error) {
-	c.Log = validLoggerConfig(c)
+	// c.Log = validLoggerConfig(c)
 	c.Option = validOptionData(c)
 
-	logger, err := logger.New(c.Log)
+	writer, err := syslog.New(syslog.LOG_INFO|syslog.LOG_LOCAL0, "goCron")
 	if err != nil {
-		return nil, fmt.Errorf("Failed to initialize `pardnchiu/go-logger`: %w", err)
+		logger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+			Level: slog.LevelInfo,
+		}))
+	} else {
+		logger = slog.New(slog.NewJSONHandler(writer, &slog.HandlerOptions{
+			Level: slog.LevelInfo,
+		}))
 	}
 
+	// logger, err := logger.New(c.Log)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("Failed to initialize `pardnchiu/go-logger`: %w", err)
+	// }
+
 	if err := handlePEM(c); err != nil {
-		return nil, logger.Error(err, "Failed to handle PEM")
+		logger.Error("Failed to handle PEM", "error", err)
+		return nil, fmt.Errorf("failed to handle PEM: %w", err)
 	}
 
 	privateKey, publicKey, err := parsePEM(c)
 	if err != nil {
-		return nil, logger.Error(err, "Failed to parse PEM key")
+		logger.Error("Failed to parse PEM key", "error", err)
+		return nil, fmt.Errorf("failed to parse PEM key: %w", err)
 	}
 
 	ctx := context.Background()
@@ -34,14 +50,15 @@ func New(c Config) (*JWTAuth, error) {
 		DB:       c.Redis.DB,
 	})
 	if _, err := redis.Ping(ctx).Result(); err != nil {
-		return nil, logger.Error(err, "Failed to connect Redis")
+		logger.Error("Failed to connect Redis", err)
+		return nil, fmt.Errorf("failed to connect Redis: %w", err)
 	}
 
 	return &JWTAuth{
 		config:  c,
 		redis:   redis,
 		context: ctx,
-		logger:  logger,
+		// logger:  logger,
 		pem: Pem{
 			private: privateKey,
 			public:  publicKey,
@@ -53,25 +70,25 @@ func (j *JWTAuth) Close() error {
 	return j.redis.Close()
 }
 
-func validLoggerConfig(c Config) *Log {
-	if c.Log == nil {
-		c.Log = &Log{
-			Path:    defaultLogPath,
-			Stdout:  false,
-			MaxSize: defaultLogMaxSize,
-		}
-	}
-	if c.Log.Path == "" {
-		c.Log.Path = defaultLogPath
-	}
-	if c.Log.MaxSize <= 0 {
-		c.Log.MaxSize = defaultLogMaxSize
-	}
-	if c.Log.MaxBackup <= 0 {
-		c.Log.MaxBackup = defaultLogMaxBackup
-	}
-	return c.Log
-}
+// func validLoggerConfig(c Config) *Log {
+// 	if c.Log == nil {
+// 		c.Log = &Log{
+// 			Path:    defaultLogPath,
+// 			Stdout:  false,
+// 			MaxSize: defaultLogMaxSize,
+// 		}
+// 	}
+// 	if c.Log.Path == "" {
+// 		c.Log.Path = defaultLogPath
+// 	}
+// 	if c.Log.MaxSize <= 0 {
+// 		c.Log.MaxSize = defaultLogMaxSize
+// 	}
+// 	if c.Log.MaxBackup <= 0 {
+// 		c.Log.MaxBackup = defaultLogMaxBackup
+// 	}
+// 	return c.Log
+// }
 
 func validOptionData(c Config) *Option {
 	defaultOption := &Option{

@@ -14,9 +14,10 @@ func (j *JWTAuth) Revoke(w http.ResponseWriter, r *http.Request) JWTAuthResult {
 	j.clearCookie(w, j.config.Option.RefreshIdCookieKey)
 
 	if refreshId == "" {
+		logger.Error("Failed to acquire lock for refresh token")
 		return JWTAuthResult{
 			StatusCode: http.StatusBadRequest,
-			Error:      j.logger.Error(nil, "Missing refresh ID").Error(),
+			Error:      "failed to acquire lock for refresh token",
 			ErrorTag:   errorDataMissing,
 		}
 	}
@@ -30,35 +31,39 @@ func (j *JWTAuth) Revoke(w http.ResponseWriter, r *http.Request) JWTAuthResult {
 	_, err := pipe1.Exec(j.context)
 
 	if err != nil {
+		logger.Error("Failed to acquire lock for refresh token", "error", err)
 		return JWTAuthResult{
 			StatusCode: http.StatusInternalServerError,
-			Error:      j.logger.Error(err, "Failed to execute Redis pipeline").Error(),
+			Error:      fmt.Errorf("failed to acquire lock for refresh token: %w", err).Error(),
 			ErrorTag:   errorFailedToGet,
 		}
 	}
 
 	result, err := getCmd.Result()
 	if err != nil && err.Error() != "redis: nil" {
+		logger.Error("Failed to get refresh token", "error", err)
 		return JWTAuthResult{
 			StatusCode: http.StatusBadRequest,
-			Error:      j.logger.Error(err, "Failed to get refresh token").Error(),
+			Error:      fmt.Errorf("failed to get refresh token: %w", err).Error(),
 			ErrorTag:   errorFailedToGet,
 		}
 	}
 
 	ttl, err := ttlCmd.Result()
 	if err != nil {
+		logger.Error("Failed to get refresh token TTL", "error", err)
 		return JWTAuthResult{
 			StatusCode: http.StatusBadRequest,
-			Error:      j.logger.Error(err, "Failed to get refresh token TTL").Error(),
+			Error:      fmt.Errorf("failed to get refresh token TTL: %w", err).Error(),
 			ErrorTag:   errorFailedToGet,
 		}
 	}
 
 	if ttl <= 0 {
+		logger.Error("Refresh token expired")
 		return JWTAuthResult{
 			StatusCode: http.StatusBadRequest,
-			Error:      j.logger.Error(nil, "Refresh token expired").Error(),
+			Error:      "refresh token expired",
 			ErrorTag:   errorUnAuthorized,
 		}
 	}
@@ -70,9 +75,10 @@ func (j *JWTAuth) Revoke(w http.ResponseWriter, r *http.Request) JWTAuthResult {
 	_, err = pipe2.Exec(j.context)
 
 	if err != nil {
+		logger.Error("Failed to revoke refresh token", "error", err)
 		return JWTAuthResult{
 			StatusCode: http.StatusInternalServerError,
-			Error:      j.logger.Error(err, "Failed to revoke token").Error(),
+			Error:      fmt.Errorf("failed to revoke refresh token: %w", err).Error(),
 			ErrorTag:   errorFailedToStore,
 		}
 	}

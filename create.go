@@ -16,27 +16,30 @@ func (j *JWTAuth) Create(w http.ResponseWriter, r *http.Request, auth *Auth) JWT
 
 	// * 未提供 Auth 資料
 	if auth == nil {
+		logger.Error("missing auth data")
 		return JWTAuthResult{
 			StatusCode: http.StatusBadRequest,
-			Error:      j.logger.Error(nil, "missing auth data").Error(),
+			Error:      "missing auth data",
 			ErrorTag:   errorDataMissing,
 		}
 	}
 
 	refreshID, err := j.createRefreshId(auth, fp, jti)
 	if err != nil {
+		logger.Error("refresh ID creation failed", "error", err)
 		return JWTAuthResult{
 			StatusCode: http.StatusInternalServerError,
-			Error:      j.logger.Error(err, "refresh ID creation failed").Error(),
+			Error:      err.Error(),
 			ErrorTag:   errorFailedToCreate,
 		}
 	}
 
 	accessToken, err := j.signJWT(auth, refreshID, fp, jti)
 	if err != nil {
+		logger.Error("JWT signing failed", "error", err)
 		return JWTAuthResult{
 			StatusCode: http.StatusInternalServerError,
-			Error:      j.logger.Error(err, "JWT signing failed").Error(),
+			Error:      err.Error(),
 			ErrorTag:   errorFailedToSign,
 		}
 	}
@@ -54,9 +57,10 @@ func (j *JWTAuth) Create(w http.ResponseWriter, r *http.Request, auth *Auth) JWT
 	}
 	refreshDataJson, err := json.Marshal(refreshData)
 	if err != nil {
+		logger.Error("refresh data marshaling failed", "error", err)
 		return JWTAuthResult{
 			StatusCode: http.StatusInternalServerError,
-			Error:      j.logger.Error(err, "refresh data marshaling failed").Error(),
+			Error:      err.Error(),
 			ErrorTag:   errorFailedToCreate,
 		}
 	}
@@ -69,9 +73,10 @@ func (j *JWTAuth) Create(w http.ResponseWriter, r *http.Request, auth *Auth) JWT
 	pipe.SetEx(j.context, keyJTI, "1", j.config.Option.AccessTokenExpires)
 	_, err = pipe.Exec(j.context)
 	if err != nil {
+		logger.Error("Redis transaction failed", "error", err)
 		return JWTAuthResult{
 			StatusCode: http.StatusInternalServerError,
-			Error:      j.logger.Error(err, "Redis transaction failed").Error(),
+			Error:      err.Error(),
 			ErrorTag:   errorFailedToStore,
 		}
 	}

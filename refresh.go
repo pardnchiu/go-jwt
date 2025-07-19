@@ -16,9 +16,10 @@ func (j *JWTAuth) refresh(w http.ResponseWriter, r *http.Request) JWTAuthResult 
 	refreshData, ttl, err := j.getRefreshData(refreshID, fp)
 	// * Invalid Refresh ID or expired
 	if err != nil || ttl == 0 || refreshData.Data == nil {
+		logger.Error("Invalid refresh id", "error", err)
 		return JWTAuthResult{
 			StatusCode: http.StatusUnauthorized,
-			Error:      j.logger.Error(err, "Invalid refresh id").Error(),
+			Error:      fmt.Errorf("invalid refresh id: %w", err).Error(),
 			ErrorTag:   errorUnAuthorized,
 		}
 	}
@@ -28,9 +29,10 @@ func (j *JWTAuth) refresh(w http.ResponseWriter, r *http.Request) JWTAuthResult 
 	isUnlock, err := j.redis.SetNX(j.context, keyLock, lockValue, 3*time.Second).Result()
 	// * Lock failed, another request is processing the same Refresh ID or Redis error
 	if err != nil || !isUnlock {
+		logger.Error("Failed to acquire lock for refresh token", "error", err)
 		return JWTAuthResult{
 			StatusCode: http.StatusTooManyRequests,
-			Error:      j.logger.Error(err, "Refresh token lock acquisition failed").Error(),
+			Error:      fmt.Errorf("failed to acquire lock for refresh token: %w", err).Error(),
 			ErrorTag:   errorFailedToUpdate,
 		}
 	}
@@ -57,9 +59,10 @@ func (j *JWTAuth) refresh(w http.ResponseWriter, r *http.Request) JWTAuthResult 
 	newRefreshDataJson, err := json.Marshal(newRefreshData)
 	// * Cannot convert new Refresh Data to JSON
 	if err != nil {
+		logger.Error("Failed to marshal new refresh data", "error", err)
 		return JWTAuthResult{
 			StatusCode: http.StatusInternalServerError,
-			Error:      j.logger.Error(err, "JSON marshaling failed").Error(),
+			Error:      fmt.Errorf("failed to marshal new refresh data: %w", err).Error(),
 			ErrorTag:   errorFailedToCreate,
 		}
 	}
@@ -69,10 +72,11 @@ func (j *JWTAuth) refresh(w http.ResponseWriter, r *http.Request) JWTAuthResult 
 		exists, err := j.config.CheckAuth(*refreshData.Data)
 		// * User authentication failed or does not exist
 		if err != nil || !exists {
+			logger.Error("Failed to authenticate user", "error", err)
 			return JWTAuthResult{
 				Success:    false,
 				StatusCode: http.StatusUnauthorized,
-				Error:      j.logger.Error(err, "User authentication failed").Error(),
+				Error:      fmt.Errorf("failed to authenticate user: %w", err).Error(),
 			}
 		}
 	}
@@ -82,9 +86,10 @@ func (j *JWTAuth) refresh(w http.ResponseWriter, r *http.Request) JWTAuthResult 
 	if refreshData.Version > j.config.Option.MaxVersion || ttl < time.Duration(float64(j.config.Option.RefreshIdExpires)*j.config.Option.RefreshTTL) {
 		// * Cannot update Refresh Data in Redis
 		if err := j.redis.SetEx(j.context, keyRefreshID, string(newRefreshDataJson), 3*time.Second).Err(); err != nil {
+			logger.Error("Failed to update refresh data in Redis", "error", err)
 			return JWTAuthResult{
 				StatusCode: http.StatusInternalServerError,
-				Error:      j.logger.Error(err, "Redis refresh data update failed").Error(),
+				Error:      fmt.Errorf("failed to update refresh data in Redis: %w", err).Error(),
 				ErrorTag:   errorFailedToStore,
 			}
 		}
@@ -95,9 +100,10 @@ func (j *JWTAuth) refresh(w http.ResponseWriter, r *http.Request) JWTAuthResult 
 	newAccessToken, err := j.signJWT(refreshData.Data, refreshID, fp, jti)
 	// * Cannot sign new Access Token
 	if err != nil {
+		logger.Error("Failed to sign new access token", "error", err)
 		return JWTAuthResult{
 			StatusCode: http.StatusInternalServerError,
-			Error:      j.logger.Error(err, "JWT signing failed").Error(),
+			Error:      fmt.Errorf("failed to sign new access token: %w", err).Error(),
 			ErrorTag:   errorFailedToSign,
 		}
 	}
@@ -109,9 +115,10 @@ func (j *JWTAuth) refresh(w http.ResponseWriter, r *http.Request) JWTAuthResult 
 	pipe.SetEx(j.context, keyJTI, "1", j.config.Option.AccessTokenExpires)
 	_, err = pipe.Exec(j.context)
 	if err != nil {
+		logger.Error("Failed to update refresh data in Redis", "error", err)
 		return JWTAuthResult{
 			StatusCode: http.StatusInternalServerError,
-			Error:      j.logger.Error(err, "Redis transaction failed").Error(),
+			Error:      fmt.Errorf("failed to update refresh data in Redis: %w", err).Error(),
 			ErrorTag:   errorFailedToStore,
 		}
 	}

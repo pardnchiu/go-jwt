@@ -80,8 +80,8 @@ flowchart TD
 - [`github.com/gin-gonic/gin`](https://github.com/gin-gonic/gin)
 - [`github.com/golang-jwt/jwt/v5`](https://github.com/golang-jwt/jwt/v5)
 - [`github.com/redis/go-redis/v9`](https://github.com/redis/go-redis/v9)
-- [`github.com/pardnchiu/go-logger`](https://github.com/pardnchiu/go-logger)<br>
-  如果你不需要，你可以 fork 然後使用你熟悉的取代。更可以到[這裡](https://forms.gle/EvNLwzpHfxWR2gmP6)進行投票讓我知道。
+- ~~[`github.com/pardnchiu/go-logger`](https://github.com/pardnchiu/go-logger)~~ (< v1.0.1)<br>
+  為了效能與穩定度，`v1.0.1` 起棄用非標準庫套件，改用 `log/slog`
 
 ## 使用方法
 
@@ -176,7 +176,6 @@ func main() {
 type Config struct {
   Redis     Redis                    // Redis configuration (required)
   File      *File                    // File configuration for key management (optional)
-  Log       *Log                     // Logging configuration (optional)
   Option    *Option                  // System parameters and token settings (optional)
   Cookie    *Cookie                  // Cookie security settings (optional)
   CheckAuth func(Auth) (bool, error) // User authentication function (optional)
@@ -192,14 +191,6 @@ type Redis struct {
 type File struct {
   PrivateKeyPath string // ECDSA private key file path for JWT signing
   PublicKeyPath  string // ECDSA public key file path for JWT verification
-}
-
-type Log struct {
-  Path      string // Log directory path (default: ./logs/jwtAuth)
-  Stdout    bool   // Enable console log output (default: false)
-  MaxSize   int64  // Maximum size before log file rotation (bytes) (default: 16MB)
-  MaxBackup int    // Number of rotated log files to retain (default: 5)
-  Type      string // Output format: "json" for slog standard, "text" for tree format (default: "text")
 }
 
 type Option struct {
@@ -231,7 +222,6 @@ type Cookie struct {
   auth, err := goJwt.New(config)
   ```
   - 初始化 Redis 連線
-  - 設定日誌系統
   - 若未提供則自動生成 ECDSA 金鑰
   - 驗證配置
 

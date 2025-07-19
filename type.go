@@ -3,11 +3,16 @@ package goJwt
 import (
 	"context"
 	"crypto/ecdsa"
+	"log/slog"
 	"net/http"
 	"time"
 
-	"github.com/pardnchiu/go-logger"
+	// "github.com/pardnchiu/go-logger"
 	"github.com/redis/go-redis/v9"
+)
+
+var (
+	logger *slog.Logger
 )
 
 const (
@@ -49,13 +54,13 @@ const (
 )
 
 // * 繼承至 pardnchiu/go-logger
-type Log = logger.Log
-type Logger = logger.Logger
+// type Log = logger.Log
+// type Logger = logger.Logger
 
 type Config struct {
-	Redis     Redis                    `json:"redis"`               // Redis 設定
-	File      *File                    `json:"file,omitempty"`      // 檔案設定
-	Log       *Log                     `json:"log,omitempty"`       // 日誌設定
+	Redis Redis `json:"redis"`          // Redis 設定
+	File  *File `json:"file,omitempty"` // 檔案設定
+	// Log       *Log                     `json:"log,omitempty"`       // 日誌設定
 	Option    *Option                  `json:"parameter,omitempty"` // 可調參數
 	Cookie    *Cookie                  `json:"cookie,omitempty"`    // Cookie 設定
 	CheckAuth func(Auth) (bool, error) `json:"-"`                   // 檢查使用者是否存在的函數
@@ -95,9 +100,9 @@ type Cookie struct {
 type JWTAuth struct {
 	context context.Context
 	config  Config
-	logger  *Logger
-	redis   *redis.Client
-	pem     Pem
+	// logger  *Logger
+	redis *redis.Client
+	pem   Pem
 }
 
 type Pem struct {

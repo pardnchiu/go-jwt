@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -33,7 +34,8 @@ func (j *JWTAuth) createRefreshId(
 		Jti:         jti,
 	})
 	if err != nil {
-		return "", j.logger.Error(err, "[Failed] Parse Refresh Data")
+		logger.Error("Failed to marshal refresh ID data", "error", err)
+		return "", fmt.Errorf("failed to marshal refresh ID data: %w", err)
 	}
 
 	hash := sha256.Sum256(data)

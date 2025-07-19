@@ -82,8 +82,8 @@ flowchart TD
 - [`github.com/gin-gonic/gin`](https://github.com/gin-gonic/gin)
 - [`github.com/golang-jwt/jwt/v5`](https://github.com/golang-jwt/jwt/v5)
 - [`github.com/redis/go-redis/v9`](https://github.com/redis/go-redis/v9)
-- [`github.com/pardnchiu/go-logger`](https://github.com/pardnchiu/go-logger)<br>
-  If not needed, you can fork and replace it with your preferred logger. You can also vote [here](https://forms.gle/EvNLwzpHfxWR2gmP6) to share your feedback.
+- ~~[`github.com/pardnchiu/go-logger`](https://github.com/pardnchiu/go-logger)~~ (< v0.3.1)<br>
+  Starting from `v0.3.1`, non-standard libraries are deprecated for performance and stability. Replaced with `log/slog`.
 
 ## Usage
 
@@ -178,7 +178,6 @@ func main() {
 type Config struct {
   Redis     Redis                    // Redis configuration (required)
   File      *File                    // File configuration for key management (optional)
-  Log       *Log                     // Logging configuration (optional)
   Option    *Option                  // System parameters and token settings (optional)
   Cookie    *Cookie                  // Cookie security settings (optional)
   CheckAuth func(Auth) (bool, error) // User authentication function (optional)
@@ -194,14 +193,6 @@ type Redis struct {
 type File struct {
   PrivateKeyPath string // ECDSA private key file path for JWT signing
   PublicKeyPath  string // ECDSA public key file path for JWT verification
-}
-
-type Log struct {
-  Path      string // Log directory path (default: ./logs/jwtAuth)
-  Stdout    bool   // Enable console log output (default: false)
-  MaxSize   int64  // Maximum size before log file rotation (bytes) (default: 16MB)
-  MaxBackup int    // Number of rotated log files to retain (default: 5)
-  Type      string // Output format: "json" for slog standard, "text" for tree format (default: "text")
 }
 
 type Option struct {
@@ -233,7 +224,6 @@ type Cookie struct {
   auth, err := goJwt.New(config)
   ```
   - Initializes Redis connection
-  - Sets up logging system
   - Auto-generates ECDSA keys if not provided
   - Validates configuration
 

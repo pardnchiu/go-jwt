@@ -2,7 +2,7 @@
 
 > 一個提供存取權杖和更新權杖的 Golang JWT 身份驗證套件，具備指紋識別、Redis 儲存和自動更新功能。
 
-[![lang](https://img.shields.io/badge/lang-Go-blue)](README.zh.md) 
+![lang](https://img.shields.io/badge/lang-Go-blue)
 [![license](https://img.shields.io/github/license/pardnchiu/go-jwt)](LICENSE)
 [![version](https://img.shields.io/github/v/tag/pardnchiu/go-jwt)](https://github.com/pardnchiu/go-jwt/releases)
 ![card](https://goreportcard.com/badge/github.com/pardnchiu/go-jwt)<br>
@@ -316,6 +316,10 @@ type JWTAuthResult struct {
 ## 授權條款
 
 此原始碼專案採用 [MIT](LICENSE) 授權條款。
+
+## 星
+
+[![Star](https://api.star-history.com/svg?repos=pardnchiu/go-jwt&type=Date)](https://www.star-history.com/#pardnchiu/go-jwt&Date)
 
 ## 作者
 

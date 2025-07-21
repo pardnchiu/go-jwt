@@ -4,7 +4,7 @@
 # JWT Authentication
 > A Golang JWT authentication library providing access and refresh tokens with fingerprint recognition, Redis storage, and automatic refresh functionality.
 
-[![lang](https://img.shields.io/badge/lang-Go-blue)](README.md) 
+![lang](https://img.shields.io/badge/lang-Go-blue)
 [![license](https://img.shields.io/github/license/pardnchiu/go-jwt)](LICENSE)
 [![version](https://img.shields.io/github/v/tag/pardnchiu/go-jwt)](https://github.com/pardnchiu/go-jwt/releases)
 ![card](https://goreportcard.com/badge/github.com/pardnchiu/go-jwt)<br>
@@ -318,6 +318,10 @@ type JWTAuthResult struct {
 ## License
 
 This project is licensed under the [MIT](LICENSE) license.
+
+## Star
+
+[![Star](https://api.star-history.com/svg?repos=pardnchiu/go-jwt&type=Date)](https://www.star-history.com/#pardnchiu/go-jwt&Date)
 
 ## Author
 

@@ -4,12 +4,13 @@
 # JWT Authentication
 > A Golang JWT authentication library providing access and refresh tokens with fingerprint recognition, Redis storage, and automatic refresh functionality.
 
-![lang](https://img.shields.io/badge/lang-Go-blue)
-[![license](https://img.shields.io/github/license/pardnchiu/go-jwt)](LICENSE)
-[![version](https://img.shields.io/github/v/tag/pardnchiu/go-jwt)](https://github.com/pardnchiu/go-jwt/releases)
-![card](https://goreportcard.com/badge/github.com/pardnchiu/go-jwt)<br>
+[![pkg](https://pkg.go.dev/badge/github.com/pardnchiu/go-jwt.svg)](https://pkg.go.dev/github.com/pardnchiu/go-jwt)
+[![card](https://goreportcard.com/badge/github.com/pardnchiu/go-jwt)](https://goreportcard.com/report/github.com/pardnchiu/go-jwt)
+[![codecov](https://img.shields.io/codecov/c/github/pardnchiu/go-jwt)](https://app.codecov.io/github/pardnchiu/go-jwt)
+[![version](https://img.shields.io/github/v/tag/pardnchiu/go-jwt?label=release)](https://github.com/pardnchiu/go-jwt/releases)
+[![license](https://img.shields.io/github/license/pardnchiu/go-jwt)](LICENSE)<br>
 [![readme](https://img.shields.io/badge/readme-EN-white)](README.md)
-[![readme](https://img.shields.io/badge/readme-ZH-white)](README.zh.md) 
+[![readme](https://img.shields.io/badge/readme-ZH-white)](README.zh.md)
 
 ## Key Features
 

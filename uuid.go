@@ -3,11 +3,14 @@ package goJwt
 import (
 	"crypto/rand"
 	"fmt"
+	"io"
 )
+
+var randReader io.Reader = rand.Reader
 
 func uuid() string {
 	uuid := make([]byte, 16)
-	_, err := rand.Read(uuid)
+	_, err := randReader.Read(uuid)
 	if err != nil {
 		return ""
 	}

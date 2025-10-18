@@ -50,7 +50,7 @@ func New(c Config) (*JWTAuth, error) {
 		DB:       c.Redis.DB,
 	})
 	if _, err := redis.Ping(ctx).Result(); err != nil {
-		logger.Error("Failed to connect Redis", err)
+		logger.Error("Failed to connect Redis", "error", err)
 		return nil, fmt.Errorf("failed to connect Redis: %w", err)
 	}
 

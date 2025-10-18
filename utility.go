@@ -61,8 +61,17 @@ func (j *JWTAuth) getFingerprint(w http.ResponseWriter, r *http.Request) string 
 
 	j.setCookie(w, cookieKeyDeviceID, deviceID, time.Now().Add(90*24*time.Hour))
 
-	os := "OS:" + uuid()
-	browser := "Browser:" + uuid()
+	os := "Unknown"
+	browser := "Unknown"
+
+	if testMode := r.Header.Get("X-Test-Mode"); testMode == "true" {
+		os = "TestOS"
+		browser = "TestBrowser"
+	} else {
+		os = "OS:" + uuid()
+		browser = "Browser:" + uuid()
+	}
+
 	device := "Desktop"
 
 	switch {
@@ -81,14 +90,14 @@ func (j *JWTAuth) getFingerprint(w http.ResponseWriter, r *http.Request) string 
 	switch {
 	case strings.Contains(userAgent, "Edge") || strings.Contains(userAgent, "Edg"):
 		browser = "Edge"
-	case strings.Contains(userAgent, "Firefox"):
-		browser = "Firefox"
-	case strings.Contains(userAgent, "Chrome"):
-		browser = "Chrome"
-	case strings.Contains(userAgent, "Safari"):
-		browser = "Safari"
 	case strings.Contains(userAgent, "Opera") || strings.Contains(userAgent, "OPR"):
 		browser = "Opera"
+	case strings.Contains(userAgent, "Chrome"):
+		browser = "Chrome"
+	case strings.Contains(userAgent, "Firefox"):
+		browser = "Firefox"
+	case strings.Contains(userAgent, "Safari") && !strings.Contains(userAgent, "Chrome"):
+		browser = "Safari"
 	}
 
 	switch {

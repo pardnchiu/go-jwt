@@ -16,9 +16,12 @@ var (
 )
 
 const (
-	defaultLogPath        = "./logs/jwt"
-	defaultLogMaxSize     = 16 * 1024 * 1024
-	defaultLogMaxBackup   = 5
+	defaultLogPath      = "./logs/jwt"
+	defaultLogMaxSize   = 16 * 1024 * 1024
+	defaultLogMaxBackup = 5
+)
+
+var (
 	defaultPrivateKeyPath = "./keys/private-key.pem"
 	defaultPublicKeyPath  = "./keys/public-key.pem"
 )

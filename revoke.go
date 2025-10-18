@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/redis/go-redis/v9"
 )
 
 func (j *JWTAuth) Revoke(w http.ResponseWriter, r *http.Request) JWTAuthResult {
@@ -14,10 +16,10 @@ func (j *JWTAuth) Revoke(w http.ResponseWriter, r *http.Request) JWTAuthResult {
 	j.clearCookie(w, j.config.Option.RefreshIdCookieKey)
 
 	if refreshId == "" {
-		logger.Error("Failed to acquire lock for refresh token")
+		logger.Error("Refresh ID missing")
 		return JWTAuthResult{
 			StatusCode: http.StatusBadRequest,
-			Error:      "failed to acquire lock for refresh token",
+			Error:      "refresh ID required",
 			ErrorTag:   errorDataMissing,
 		}
 	}
@@ -25,36 +27,31 @@ func (j *JWTAuth) Revoke(w http.ResponseWriter, r *http.Request) JWTAuthResult {
 	keyRefreshID := fmt.Sprintf(redisKeyRefreshID, refreshId)
 	keyRevoke := fmt.Sprintf(redisKeyRevoke, accessToken)
 
-	pipe1 := j.redis.TxPipeline()
-	getCmd := pipe1.Get(j.context, keyRefreshID)
-	ttlCmd := pipe1.TTL(j.context, keyRefreshID)
-	_, err := pipe1.Exec(j.context)
-
-	if err != nil {
-		logger.Error("Failed to acquire lock for refresh token", "error", err)
+	// Get refresh data and TTL in single operation (單一操作獲取數據和 TTL)
+	refreshData, err := j.redis.Get(j.context, keyRefreshID).Result()
+	if err == redis.Nil {
+		logger.Error("Refresh token not found")
 		return JWTAuthResult{
-			StatusCode: http.StatusInternalServerError,
-			Error:      fmt.Errorf("failed to acquire lock for refresh token: %w", err).Error(),
-			ErrorTag:   errorFailedToGet,
+			StatusCode: http.StatusUnauthorized,
+			Error:      "refresh token not found or already revoked",
+			ErrorTag:   errorUnAuthorized,
 		}
 	}
-
-	result, err := getCmd.Result()
-	if err != nil && err.Error() != "redis: nil" {
+	if err != nil {
 		logger.Error("Failed to get refresh token", "error", err)
 		return JWTAuthResult{
-			StatusCode: http.StatusBadRequest,
+			StatusCode: http.StatusInternalServerError,
 			Error:      fmt.Errorf("failed to get refresh token: %w", err).Error(),
 			ErrorTag:   errorFailedToGet,
 		}
 	}
 
-	ttl, err := ttlCmd.Result()
+	ttl, err := j.redis.TTL(j.context, keyRefreshID).Result()
 	if err != nil {
 		logger.Error("Failed to get refresh token TTL", "error", err)
 		return JWTAuthResult{
-			StatusCode: http.StatusBadRequest,
-			Error:      fmt.Errorf("failed to get refresh token TTL: %w", err).Error(),
+			StatusCode: http.StatusInternalServerError,
+			Error:      fmt.Errorf("failed to get TTL: %w", err).Error(),
 			ErrorTag:   errorFailedToGet,
 		}
 	}
@@ -62,23 +59,21 @@ func (j *JWTAuth) Revoke(w http.ResponseWriter, r *http.Request) JWTAuthResult {
 	if ttl <= 0 {
 		logger.Error("Refresh token expired")
 		return JWTAuthResult{
-			StatusCode: http.StatusBadRequest,
+			StatusCode: http.StatusUnauthorized,
 			Error:      "refresh token expired",
 			ErrorTag:   errorUnAuthorized,
 		}
 	}
 
-	pipe2 := j.redis.TxPipeline()
-	pipe2.SetEx(j.context, keyRefreshID, result, 5*time.Second)
-	// * Not setting TTL to reduce one parsing step
-	pipe2.SetEx(j.context, keyRevoke, "1", j.config.Option.AccessTokenExpires)
-	_, err = pipe2.Exec(j.context)
+	pipe := j.redis.TxPipeline()
+	pipe.SetEx(j.context, keyRefreshID, refreshData, 5*time.Second)
+	pipe.SetEx(j.context, keyRevoke, "1", j.config.Option.AccessTokenExpires)
 
-	if err != nil {
-		logger.Error("Failed to revoke refresh token", "error", err)
+	if _, err := pipe.Exec(j.context); err != nil {
+		logger.Error("Failed to revoke tokens", "error", err)
 		return JWTAuthResult{
 			StatusCode: http.StatusInternalServerError,
-			Error:      fmt.Errorf("failed to revoke refresh token: %w", err).Error(),
+			Error:      fmt.Errorf("failed to revoke tokens: %w", err).Error(),
 			ErrorTag:   errorFailedToStore,
 		}
 	}

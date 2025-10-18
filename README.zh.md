@@ -2,12 +2,13 @@
 
 > 一個提供存取權杖和更新權杖的 Golang JWT 身份驗證套件，具備指紋識別、Redis 儲存和自動更新功能。
 
-![lang](https://img.shields.io/badge/lang-Go-blue)
-[![license](https://img.shields.io/github/license/pardnchiu/go-jwt)](LICENSE)
-[![version](https://img.shields.io/github/v/tag/pardnchiu/go-jwt)](https://github.com/pardnchiu/go-jwt/releases)
-![card](https://goreportcard.com/badge/github.com/pardnchiu/go-jwt)<br>
+[![pkg](https://pkg.go.dev/badge/github.com/pardnchiu/go-jwt.svg)](https://pkg.go.dev/github.com/pardnchiu/go-jwt)
+[![card](https://goreportcard.com/badge/github.com/pardnchiu/go-jwt)](https://goreportcard.com/report/github.com/pardnchiu/go-jwt)
+[![codecov](https://img.shields.io/codecov/c/github/pardnchiu/go-jwt)](https://app.codecov.io/github/pardnchiu/go-jwt)
+[![version](https://img.shields.io/github/v/tag/pardnchiu/go-jwt?label=release)](https://github.com/pardnchiu/go-jwt/releases)
+[![license](https://img.shields.io/github/license/pardnchiu/go-jwt)](LICENSE)<br>
 [![readme](https://img.shields.io/badge/readme-EN-white)](README.md)
-[![readme](https://img.shields.io/badge/readme-ZH-white)](README.zh.md) 
+[![readme](https://img.shields.io/badge/readme-ZH-white)](README.zh.md)
 
 ## 三大主軸
 

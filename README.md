@@ -8,7 +8,8 @@
 [![card](https://goreportcard.com/badge/github.com/pardnchiu/go-jwt)](https://goreportcard.com/report/github.com/pardnchiu/go-jwt)
 [![codecov](https://img.shields.io/codecov/c/github/pardnchiu/go-jwt)](https://app.codecov.io/github/pardnchiu/go-jwt)
 [![version](https://img.shields.io/github/v/tag/pardnchiu/go-jwt?label=release)](https://github.com/pardnchiu/go-jwt/releases)
-[![license](https://img.shields.io/github/license/pardnchiu/go-jwt)](LICENSE)<br>
+[![license](https://img.shields.io/github/license/pardnchiu/go-jwt)](LICENSE)
+[![Mentioned in Awesome Go](https://awesome.re/mentioned-badge.svg)](https://github.com/avelino/awesome-go)<br>
 [![readme](https://img.shields.io/badge/readme-EN-white)](README.md)
 [![readme](https://img.shields.io/badge/readme-ZH-white)](README.zh.md)
 

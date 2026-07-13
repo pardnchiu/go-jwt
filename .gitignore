@@ -3,3 +3,6 @@
 memo.md
 *.log
 coverage.out
+.gocache/
+.gomodcache/
+.tmp/

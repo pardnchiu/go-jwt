@@ -11,7 +11,8 @@
 <a href="https://pkg.go.dev/github.com/pardnchiu/go-jwt"><img src="https://img.shields.io/badge/GO-REFERENCE-blue?include_prereleases&style=for-the-badge" alt="Go Reference"></a>
 <a href="https://github.com/pardnchiu/go-jwt/releases"><img src="https://img.shields.io/github/v/tag/pardnchiu/go-jwt?include_prereleases&style=for-the-badge" alt="Release"></a>
 <a href="LICENSE"><img src="https://img.shields.io/github/license/pardnchiu/go-jwt?include_prereleases&style=for-the-badge" alt="License"></a>
-<a href="https://app.codecov.io/github/pardnchiu/go-jwt/tree/master"><img src="https://img.shields.io/codecov/c/github/pardnchiu/go-jwt/master?include_prereleases&style=for-the-badge" alt="Coverage"></a>
+<a href="https://app.codecov.io/github/pardnchiu/go-jwt/tree/develop"><img src="https://img.shields.io/codecov/c/github/pardnchiu/go-jwt/develop?include_prereleases&style=for-the-badge" alt="Coverage"></a><br>
+<a href="https://github.com/avelino/awesome-go"><img src="https://awesome.re/mentioned-badge.svg" hight="40" alt="Coverage"></a>
 </p>
 
 ***

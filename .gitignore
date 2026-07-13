@@ -6,3 +6,4 @@ coverage.out
 .gocache/
 .gomodcache/
 .tmp/
+.doc/version-generate/

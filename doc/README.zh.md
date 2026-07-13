@@ -1,3 +1,5 @@
+最後更新：2026-10-07
+
 > [!NOTE]
 > 此 README 由 [SKILL](https://github.com/agenvoy/skill-readme-generate) 生成，英文版請參閱 [這裡](../README.md)。
 
@@ -8,15 +10,15 @@
 </p>
 
 <p align="center">
-<a href="https://pkg.go.dev/github.com/pardnchiu/go-jwt"><img src="https://img.shields.io/badge/GO-REFERENCE-blue?include_prereleases&style=for-the-badge" alt="Go Reference"></a>
+<a href="https://pkg.go.dev/github.com/pardnchiu/go-jwt/core"><img src="https://img.shields.io/badge/GO-REFERENCE-blue?include_prereleases&style=for-the-badge" alt="Go Reference"></a>
 <a href="https://github.com/pardnchiu/go-jwt/releases"><img src="https://img.shields.io/github/v/tag/pardnchiu/go-jwt?include_prereleases&style=for-the-badge" alt="Release"></a>
-<a href="LICENSE"><img src="https://img.shields.io/github/license/pardnchiu/go-jwt?include_prereleases&style=for-the-badge" alt="License"></a>
-<a href="https://app.codecov.io/github/pardnchiu/go-jwt/tree/master"><img src="https://img.shields.io/codecov/c/github/pardnchiu/go-jwt/master?include_prereleases&style=for-the-badge" alt="Coverage"></a>
+<a href="../LICENSE"><img src="https://img.shields.io/github/license/pardnchiu/go-jwt?include_prereleases&style=for-the-badge" alt="License"></a><br>
+<a href="https://github.com/avelino/awesome-go"><img src="https://awesome.re/mentioned-badge.svg" height="40" alt="Mentioned in Awesome Go"></a>
 </p>
 
 ***
 
-> Go JWT 函式庫，具備 Redis 生命週期、裝置指紋綁定與雙框架中介層
+> Go JWT 驗證函式庫，具備刷新令牌輪替、Redis 撤銷與 Gin 中介層
 
 ## 目錄
 
@@ -27,17 +29,13 @@
 
 ## 功能特點
 
-> `go get github.com/pardnchiu/go-jwt` · [完整文件](./doc.zh.md)
+> `go get github.com/pardnchiu/go-jwt@latest` · 匯入路徑 `github.com/pardnchiu/go-jwt/core` · [完整文件](./doc.zh.md)
 
-```go
-import "github.com/pardnchiu/go-jwt/core"
-```
-
-- **Redis Token 生命週期** — 以 Transaction Pipeline 與分散鎖管理 Access Token 與 Refresh ID 的建立、驗證、刷新與撤銷。
-- **裝置指紋綁定** — 以 SHA-256 綁定 OS、瀏覽器與裝置 ID，Token 被竊後無法在其他裝置使用。
-- **雙框架中介層** — 提供 Gin 與 net/http 即插即用中介層，過期時透明刷新並從 context 取用使用者資料。
-- **ES256 自動 PEM** — 以 ECDSA P-256 簽署；可從路徑、內嵌 PEM 載入，或首次執行自動產生金鑰對。
-- **版本化透明刷新** — 依 MaxVersion 與 TTL 門檻僅重建 Access Token 或完整輪換 Refresh ID。
+- **Redis 管控 Token 生命週期** — Access Token 須同時通過 ES256 簽章與 Redis JTI 白名單，登出寫入撤銷紀錄即刻失效，不必等 JWT 自然過期。
+- **裝置指紋綁定** — 以 OS、瀏覽器、裝置類型與裝置 ID 的 SHA-256 指紋綁定 Token 與 Refresh ID，被竊的 Token 換裝置即驗證失敗。
+- **分散鎖透明刷新** — 過期時自動以 Refresh ID 重簽，`SETNX` 鎖加 Lua 比對解鎖確保多實例下同一 Refresh ID 只被刷新一次。
+- **版本化 Refresh ID 輪替** — 刷新次數超過 `MaxVersion` 或剩餘 TTL 低於閾值時整組重發，平時只重簽 Access Token 以降低 Redis 寫入。
+- **ES256 自動金鑰與雙框架中介層** — 金鑰可從路徑、內嵌 PEM 載入或首次啟動自動產生 P-256 金鑰對，並提供 Gin 與 `net/http` 即插即用中介層。
 
 ## 架構
 
@@ -45,13 +43,15 @@ import "github.com/pardnchiu/go-jwt/core"
 
 ```mermaid
 graph TB
-    REQ[HTTP 請求] --> MW[中介層]
+    REQ[HTTP 請求] --> MW[Gin / net/http 中介層]
     MW --> V[Verify]
-    V -->|有效| AUTH[回傳 Auth]
-    V -->|過期| RF[Refresh]
-    V -->|無 Token| DENY[拒絕]
-    RF --> REDIS[(Redis)]
     V --> FP[裝置指紋]
+    V -->|簽章 + JTI 有效| OK[回傳 Auth]
+    V -->|Access Token 過期或缺失| RF[Refresh]
+    RF -->|未達閾值| RS[重簽 Access Token]
+    RF -->|超過 MaxVersion / TTL 閾值| CR[Create 整組重發]
+    V --> REDIS[(Redis)]
+    RF --> REDIS
 ```
 
 ## 授權
@@ -60,12 +60,11 @@ graph TB
 
 ## Author
 
-<img src="https://github.com/pardnchiu.png" align="left" width="96" height="96" style="margin-right: 0.5rem;">
+Just [open an issue](https://github.com/pardnchiu/go-jwt/issues/new) to share an idea.
 
-<h4 style="padding-top: 0">邱敬幃 Pardn Chiu</h4>
-
-<a href="mailto:hi@pardn.io">hi@pardn.io</a><br>
-<a href="https://www.linkedin.com/in/pardnchiu">https://www.linkedin.com/in/pardnchiu</a>
+<a href="https://github.com/pardnchiu/go-jwt/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=pardnchiu/go-jwt&cache_bust=2026-10-07" alt="go-jwt contributors" />
+</a>
 
 ***
 

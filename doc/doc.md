@@ -5,14 +5,21 @@
 ## Prerequisites
 
 - Go 1.24 or higher
-- Redis server
+- Redis server (connected through `github.com/redis/go-redis/v9`)
+- `github.com/gin-gonic/gin` when using `GinMiddleware()`
 
 ## Installation
 
 ### Using go get
 
 ```bash
-go get github.com/pardnchiu/go-jwt
+go get github.com/pardnchiu/go-jwt@latest
+```
+
+The package lives under the `core/` subdirectory and its package name is `goJwt`:
+
+```go
+import goJwt "github.com/pardnchiu/go-jwt/core"
 ```
 
 ### From Source
@@ -23,102 +30,169 @@ cd go-jwt
 go build ./...
 ```
 
+### Running Tests
+
+Tests require a reachable Redis at `localhost:6379`:
+
+```bash
+docker run -d --name redis -p 6379:6379 redis:7-alpine
+go test -race ./...
+```
+
 ## Configuration
 
-### Config Structure
+All settings pass through `goJwt.New(goJwt.Config{...})`; the library reads no environment variables.
+
+### Config
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `Redis` | `Redis` | Yes | Redis connection settings |
 | `File` | `*File` | No | PEM key file paths |
-| `Option` | `*Option` | No | Token parameter tuning |
-| `Cookie` | `*Cookie` | No | Cookie attribute settings |
-| `CheckAuth` | `func(Auth) (bool, error)` | No | Custom user validation callback |
+| `Option` | `*Option` | No | Token parameters; `nil` applies every default |
+| `Cookie` | `*Cookie` | No | Cookie attribute overrides; `nil` keeps the defaults |
+| `CheckAuth` | `func(Auth) (bool, error)` | No | Called on every refresh to confirm the user is still valid; returning `false` or an error rejects the refresh |
 
-### Redis Settings
+### Redis
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `Host` | `string` | Yes | Redis host address |
-| `Port` | `int` | Yes | Redis port |
-| `Password` | `string` | No | Redis password |
-| `DB` | `int` | Yes | Redis database number |
+| Field | Type | Description |
+|-------|------|-------------|
+| `Host` | `string` | Host address |
+| `Port` | `int` | Port |
+| `Password` | `string` | Password (optional) |
+| `DB` | `int` | Database index |
 
-### Option Defaults
+`New()` sends a `PING` first and returns an error when the connection fails.
 
-| Field | Default | Description |
-|-------|---------|-------------|
-| `AccessTokenExpires` | `15m` | Access Token expiration |
-| `RefreshIdExpires` | `7d` | Refresh ID expiration |
-| `AccessTokenCookieKey` | `access_token` | Access Token cookie key |
-| `RefreshIdCookieKey` | `refresh_id` | Refresh ID cookie key |
-| `MaxVersion` | `5` | Refresh count before Refresh ID rebuild |
-| `RefreshTTL` | `0.5` | TTL ratio threshold for Refresh ID rebuild |
-
-### Cookie Settings
+### Option
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `Domain` | `*string` | None | Cookie domain |
-| `Path` | `*string` | `/` | Cookie path |
-| `SameSite` | `*http.SameSite` | `Lax` | SameSite attribute |
-| `Secure` | `*bool` | `false` | HTTPS only |
-| `HttpOnly` | `*bool` | `true` | HttpOnly flag |
+| `PrivateKey` | `string` | — | ECDSA private key PEM (PKCS#8) |
+| `PublicKey` | `string` | — | ECDSA public key PEM (PKIX) |
+| `AccessTokenExpires` | `time.Duration` | `15 * time.Minute` | Access Token lifetime |
+| `RefreshIdExpires` | `time.Duration` | `7 * 24 * time.Hour` | Refresh ID lifetime |
+| `AccessTokenCookieKey` | `string` | `access_token` | Access Token cookie name |
+| `RefreshIdCookieKey` | `string` | `refresh_id` | Refresh ID cookie name; also the JWT claim name holding the Refresh ID |
+| `MaxVersion` | `int` | `5` | Reissue the full token pair once the refresh count exceeds this value |
+| `RefreshTTL` | `float64` | `0.5` | Reissue the full token pair once the Refresh ID's remaining TTL drops below `RefreshIdExpires × RefreshTTL` |
 
-### PEM Keys
+Zero or negative values fall back to the defaults.
 
-Three configuration methods are supported, in priority order:
+### Cookie
 
-1. `File.PrivateKeyPath` / `File.PublicKeyPath` — specify file paths
-2. `Option.PrivateKey` / `Option.PublicKey` — provide PEM text directly
-3. Auto-detect `./keys/private-key.pem` and `./keys/public-key.pem`; generates a new ECDSA P-256 key pair if not found
+| Field | Type | Default |
+|-------|------|---------|
+| `Domain` | `*string` | unset |
+| `Path` | `*string` | `/` |
+| `SameSite` | `*http.SameSite` | `http.SameSiteLaxMode` |
+| `Secure` | `*bool` | `false` |
+| `HttpOnly` | `*bool` | `true` |
+
+Only non-`nil` fields override the defaults. Set `Secure: true` in production behind HTTPS.
+
+### Key Loading Order
+
+| Priority | Condition | Behavior |
+|----------|-----------|----------|
+| 1 | `File.PrivateKeyPath` / `File.PublicKeyPath` set | Read the files and overwrite `Option.PrivateKey` / `Option.PublicKey`; a read failure returns an error |
+| 2 | Both `Option.PrivateKey` and `Option.PublicKey` set | Use them directly |
+| 3 | Both empty and `./keys/private-key.pem`, `./keys/public-key.pem` exist | Read the existing files |
+| 4 | Both empty and those files are absent | Generate a P-256 key pair into `./keys/` (private `0600`, public `0644`) |
+| — | Only one key provided | Return an error |
+
+After loading, both keys must be ECDSA and form a matching pair. Multi-instance deployments must share one key pair; keys auto-generated per instance do not accept each other's tokens.
+
+### Request Inputs
+
+| Source | Name | Purpose |
+|--------|------|---------|
+| Cookie | `access_token` (configurable) | Access Token; takes precedence over the Authorization header |
+| Header | `Authorization: Bearer <token>` | Access Token when no cookie is present |
+| Header | `X-Refresh-ID` | Refresh ID; takes precedence over the cookie |
+| Cookie | `refresh_id` (configurable) | Refresh ID |
+| Header | `X-Device-FP` | Supplies the device fingerprint directly, skipping User-Agent derivation |
+| Header | `X-Device-ID` | Device ID; takes precedence over the cookie |
+| Cookie | `conn.device.id` | Device ID; when missing, a UUID is generated and stored in a 90-day cookie |
+
+### Response Outputs
+
+| Location | Name | When |
+|----------|------|------|
+| Set-Cookie | Access Token / Refresh ID | `Create()` and full reissue |
+| Set-Cookie | Access Token | Access-Token-only re-sign |
+| Header | `X-New-Access-Token` | Access-Token-only re-sign |
+| Set-Cookie | `conn.device.id` | Every fingerprint computation without `X-Device-FP` |
 
 ## Usage
 
-### Basic
+### Basic: net/http Login, Protected Route, Logout
 
 ```go
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 
-	"github.com/pardnchiu/go-jwt/core"
+	goJwt "github.com/pardnchiu/go-jwt/core"
 )
 
 func main() {
-	jwtAuth, err := goJwt.New(goJwt.Config{
-		Redis: goJwt.Redis{
-			Host: "localhost",
-			Port: 6379,
-			DB:   0,
-		},
+	auth, err := goJwt.New(goJwt.Config{
+		Redis: goJwt.Redis{Host: "localhost", Port: 6379},
 	})
 	if err != nil {
-		log.Fatalf("init failed: %v", err)
+		log.Fatalf("failed to init go-jwt: %v", err)
 	}
-	defer jwtAuth.Close()
+	defer auth.Close()
 
-	http.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
-		result := jwtAuth.Create(w, r, &goJwt.Auth{
-			ID:    "user-1",
-			Name:  "Alice",
-			Email: "alice@example.com",
+	mux := http.NewServeMux()
+
+	// Login: issue Access Token and Refresh ID (also written to cookies)
+	mux.HandleFunc("POST /login", func(w http.ResponseWriter, r *http.Request) {
+		result := auth.Create(w, r, &goJwt.Auth{
+			ID:    "u_001",
+			Name:  "Pardn",
+			Email: "dev@example.com",
 			Role:  "admin",
+			Scope: []string{"read", "write"},
 		})
 		if !result.Success {
 			http.Error(w, result.Error, result.StatusCode)
 			return
 		}
-		w.WriteHeader(result.StatusCode)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(result.Token)
 	})
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	// Protected route: the middleware responds with a JSON error on failure
+	mux.Handle("GET /me", auth.HTTPMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user, ok := goJwt.GetAuthDataFromHTTPRequest(r)
+		if !ok {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(user)
+	})))
+
+	// Logout: revoke the Access Token and clear cookies
+	mux.HandleFunc("POST /logout", func(w http.ResponseWriter, r *http.Request) {
+		result := auth.Revoke(w, r)
+		if !result.Success {
+			http.Error(w, result.Error, result.StatusCode)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	log.Fatal(http.ListenAndServe(":8080", mux))
 }
 ```
 
-### Advanced
+### Gin Middleware
 
 ```go
 package main
@@ -126,184 +200,205 @@ package main
 import (
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/pardnchiu/go-jwt/core"
+	goJwt "github.com/pardnchiu/go-jwt/core"
 )
 
 func main() {
-	secure := true
-	jwtAuth, err := goJwt.New(goJwt.Config{
-		Redis: goJwt.Redis{
-			Host:     "localhost",
-			Port:     6379,
-			Password: "secret",
-			DB:       1,
-		},
-		Option: &goJwt.Option{
-			AccessTokenExpires: 10 * time.Minute,
-			RefreshIdExpires:   14 * 24 * time.Hour,
-			MaxVersion:         3,
-			RefreshTTL:         0.4,
-		},
-		Cookie: &goJwt.Cookie{
-			Secure: &secure,
-		},
-		CheckAuth: func(auth goJwt.Auth) (bool, error) {
-			// return false when the user no longer exists
-			return auth.ID != "", nil
-		},
+	auth, err := goJwt.New(goJwt.Config{
+		Redis: goJwt.Redis{Host: "localhost", Port: 6379},
 	})
 	if err != nil {
-		log.Fatalf("init failed: %v", err)
+		log.Fatalf("failed to init go-jwt: %v", err)
 	}
-	defer jwtAuth.Close()
+	defer auth.Close()
 
 	r := gin.Default()
+
 	r.POST("/login", func(c *gin.Context) {
-		result := jwtAuth.Create(c.Writer, c.Request, &goJwt.Auth{
-			ID:    "user-1",
-			Name:  "Alice",
-			Email: "alice@example.com",
-			Scope: []string{"read", "write"},
-		})
+		result := auth.Create(c.Writer, c.Request, &goJwt.Auth{ID: "u_001", Name: "Pardn"})
 		if !result.Success {
-			c.JSON(result.StatusCode, gin.H{"error": result.Error})
+			c.JSON(result.StatusCode, gin.H{"error": result.Error, "tag": result.ErrorTag})
 			return
 		}
-		c.JSON(result.StatusCode, gin.H{
-			"token":      result.Token.Token,
-			"refresh_id": result.Token.RefreshId,
-		})
+		c.JSON(http.StatusOK, result.Token)
 	})
 
-	auth := r.Group("/")
-	auth.Use(jwtAuth.GinMiddleware())
-	auth.GET("/me", func(c *gin.Context) {
+	api := r.Group("/api", auth.GinMiddleware())
+	api.GET("/me", func(c *gin.Context) {
 		user, ok := goJwt.GetAuthDataFromGinContext(c)
 		if !ok {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+			c.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
 		c.JSON(http.StatusOK, user)
 	})
-	auth.POST("/logout", func(c *gin.Context) {
-		result := jwtAuth.Revoke(c.Writer, c.Request)
-		c.JSON(result.StatusCode, gin.H{"success": result.Success, "error": result.Error})
-	})
 
-	log.Fatal(r.Run(":8080"))
+	if err := r.Run(":8080"); err != nil {
+		log.Fatal(err)
+	}
 }
 ```
 
+### Advanced: Custom Options, Cookies, and User Check
+
+```go
+package main
+
+import (
+	"errors"
+	"log"
+	"net/http"
+	"time"
+
+	goJwt "github.com/pardnchiu/go-jwt/core"
+)
+
+var errUserBanned = errors.New("user banned")
+
+func main() {
+	domain := "example.com"
+	secure := true
+	sameSite := http.SameSiteStrictMode
+
+	auth, err := goJwt.New(goJwt.Config{
+		Redis: goJwt.Redis{Host: "redis.internal", Port: 6379, Password: "secret", DB: 1},
+		File: &goJwt.File{
+			PrivateKeyPath: "/etc/app/keys/private-key.pem",
+			PublicKeyPath:  "/etc/app/keys/public-key.pem",
+		},
+		Option: &goJwt.Option{
+			AccessTokenExpires: 10 * time.Minute,
+			RefreshIdExpires:   30 * 24 * time.Hour,
+			MaxVersion:         10,
+			RefreshTTL:         0.3,
+		},
+		Cookie: &goJwt.Cookie{
+			Domain:   &domain,
+			Secure:   &secure,
+			SameSite: &sameSite,
+		},
+		// Confirm on every refresh that the user still exists and is not banned
+		CheckAuth: func(a goJwt.Auth) (bool, error) {
+			if a.ID == "u_banned" {
+				return false, errUserBanned
+			}
+			return true, nil
+		},
+	})
+	if err != nil {
+		log.Fatalf("failed to init go-jwt: %v", err)
+	}
+	defer auth.Close()
+}
+```
+
+### Non-Browser Clients (API / Mobile App)
+
+Without cookies, a User-Agent that matches no known OS or browser yields a different fingerprint on every request, so non-browser clients must send a stable `X-Device-FP`:
+
+```bash
+# Login
+curl -X POST http://localhost:8080/login \
+  -H "X-Device-FP: device-7f3a9c"
+
+# Access with Access Token and Refresh ID
+curl http://localhost:8080/me \
+  -H "X-Device-FP: device-7f3a9c" \
+  -H "Authorization: Bearer <token>" \
+  -H "X-Refresh-ID: <refresh_id>" \
+  -D -
+```
+
+When an expired Access Token is only re-signed, the new token arrives in the `X-New-Access-Token` header; a full reissue delivers new tokens through `Set-Cookie` only.
+
 ## API Reference
 
-### New
+### Functions and Methods
+
+| Signature | Description |
+|-----------|-------------|
+| `func New(c Config) (*JWTAuth, error)` | Applies defaults, loads or generates keys, connects to Redis, and returns an instance |
+| `func (j *JWTAuth) Close() error` | Closes the Redis connection |
+| `func (j *JWTAuth) Create(w http.ResponseWriter, r *http.Request, auth *Auth) JWTAuthResult` | Issues an Access Token and Refresh ID, writing cookies and Redis records |
+| `func (j *JWTAuth) Verify(w http.ResponseWriter, r *http.Request) JWTAuthResult` | Verifies the Access Token; refreshes from the Refresh ID when it is expired or missing |
+| `func (j *JWTAuth) Revoke(w http.ResponseWriter, r *http.Request) JWTAuthResult` | Clears cookies, revokes the Access Token, and expires the Refresh ID after 5 seconds |
+| `func (j *JWTAuth) GinMiddleware() gin.HandlerFunc` | Gin middleware; on success passes `*Auth` via `c.Set("user", ...)` |
+| `func (j *JWTAuth) HTTPMiddleware(next http.Handler) http.Handler` | net/http middleware; on success stores `*Auth` in the request context |
+| `func GetAuthDataFromGinContext(c *gin.Context) (*Auth, bool)` | Reads user data from the Gin context |
+| `func GetAuthDataFromHTTPRequest(r *http.Request) (*Auth, bool)` | Reads user data from the request context |
+
+On verification failure, both middlewares respond with `result.StatusCode` and `{"error": "<message>"}`, then stop the chain.
+
+### Types
 
 ```go
-func New(c Config) (*JWTAuth, error)
+type Auth struct {
+	ID        string   `json:"id"`
+	Name      string   `json:"name"`
+	Email     string   `json:"email"`
+	Thumbnail string   `json:"thumbnail,omitempty"`
+	Scope     []string `json:"scope,omitempty"`
+	Role      string   `json:"role,omitempty"`
+	Level     int      `json:"level,omitempty"`
+}
+
+type JWTAuthResult struct {
+	StatusCode int          `json:"status_code"`
+	Success    bool         `json:"success"`
+	Data       *Auth        `json:"data,omitempty"`
+	Token      *TokenResult `json:"token,omitempty"`
+	Error      string       `json:"error,omitempty"`
+	ErrorTag   string       `json:"error_tag,omitempty"`
+}
+
+type TokenResult struct {
+	Token     string `json:"token"`
+	RefreshId string `json:"refresh_id"`
+}
+
+type RefreshData struct {
+	Data        *Auth  `json:"data,omitempty"`
+	Version     int    `json:"version"`
+	Fingerprint string `json:"fp"`
+	Exp         int64  `json:"exp"`
+	Iat         int64  `json:"iat"`
+	Jti         string `json:"jti"`
+}
 ```
 
-Creates a JWTAuth instance, connects Redis, and loads or generates ECDSA keys.
+Every `Auth` field is written into the JWT claims; keep sensitive data out of it.
 
-### Close
+`RefreshId` (the input hashed into the Refresh ID: `ID`, `Name`, `Email`, `Fingerprint`, `Iat`, `Jti`) and `Pem` (the parsed ECDSA key pair, with unexported fields) are also exported; callers do not need them directly.
 
-```go
-func (j *JWTAuth) Close() error
-```
+### Status Codes and Error Tags
 
-Closes the Redis connection.
+| StatusCode | ErrorTag | Trigger |
+|------------|----------|---------|
+| `400` | `data_missing` | `Create()` without `Auth`; `Revoke()` without a Refresh ID |
+| `400` | `data_invalid` | Access Token signature, `nbf`/`iat`, Refresh ID, fingerprint, or JTI check failed |
+| `401` | `unauthorized` | Not logged in; Refresh ID invalid, expired, or fingerprint mismatch; `Revoke()` cannot find the Refresh ID |
+| `401` | `revoked` | Access Token has been revoked |
+| `401` | (empty) | `CheckAuth` returned `false` or an error |
+| `429` | `failed_to_update` | Another request is refreshing the same Refresh ID |
+| `500` | `failed_to_create` | Refresh ID or refresh data serialization failed |
+| `500` | `failed_to_sign` | JWT signing failed |
+| `500` | `failed_to_store` | Redis write failed |
+| `500` | `failed_to_get` | Redis read failed |
 
-### Create
+### Redis Keys
 
-```go
-func (j *JWTAuth) Create(w http.ResponseWriter, r *http.Request, auth *Auth) JWTAuthResult
-```
+| Key | Value | TTL |
+|-----|-------|-----|
+| `refresh:<refreshID>` | `RefreshData` JSON | `RefreshIdExpires`; refreshes keep the remaining TTL |
+| `jti:<jti>` | `"1"` | `AccessTokenExpires` |
+| `lock:refresh:<refreshID>` | Lock holder UUID | 3 seconds |
+| `revoke:<accessToken>` | `"1"` | `AccessTokenExpires` |
 
-Issues Access Token and Refresh ID, sets cookies, and stores refresh state plus JTI in Redis.
+### Logging
 
-### Verify
-
-```go
-func (j *JWTAuth) Verify(w http.ResponseWriter, r *http.Request) JWTAuthResult
-```
-
-Verifies the Access Token, checks revocation and device fingerprint, and refreshes transparently when expired.
-
-### Revoke
-
-```go
-func (j *JWTAuth) Revoke(w http.ResponseWriter, r *http.Request) JWTAuthResult
-```
-
-Revokes the current session: clears cookies, shortens Refresh ID TTL, and marks the Access Token as revoked.
-
-### GinMiddleware
-
-```go
-func (j *JWTAuth) GinMiddleware() gin.HandlerFunc
-```
-
-Gin middleware that runs Verify and stores `*Auth` under the `user` context key.
-
-### HTTPMiddleware
-
-```go
-func (j *JWTAuth) HTTPMiddleware(next http.Handler) http.Handler
-```
-
-Standard library middleware that runs Verify and stores `*Auth` in `request.Context`.
-
-### GetAuthDataFromGinContext
-
-```go
-func GetAuthDataFromGinContext(c *gin.Context) (*Auth, bool)
-```
-
-Reads authenticated user data from a Gin context.
-
-### GetAuthDataFromHTTPRequest
-
-```go
-func GetAuthDataFromHTTPRequest(r *http.Request) (*Auth, bool)
-```
-
-Reads authenticated user data from an `http.Request` context.
-
-### Auth
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `ID` | `string` | User ID |
-| `Name` | `string` | Display name |
-| `Email` | `string` | Email |
-| `Thumbnail` | `string` | Avatar URL |
-| `Scope` | `[]string` | Permission scopes |
-| `Role` | `string` | Role |
-| `Level` | `int` | Level |
-
-### JWTAuthResult
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `StatusCode` | `int` | HTTP status code |
-| `Success` | `bool` | Whether the operation succeeded |
-| `Data` | `*Auth` | Authenticated user data |
-| `Token` | `*TokenResult` | Issued token pair |
-| `Error` | `string` | Error message |
-| `ErrorTag` | `string` | Machine-readable error tag |
-
-### Headers
-
-| Header | Direction | Description |
-|--------|-----------|-------------|
-| `Authorization: Bearer <token>` | Request | Access Token (cookie alternative) |
-| `X-Refresh-ID` | Request | Refresh ID (cookie alternative) |
-| `X-Device-FP` | Request | Override device fingerprint |
-| `X-Device-ID` | Request | Stable device ID |
-| `X-New-Access-Token` | Response | New Access Token after refresh |
-| `X-New-Refresh-ID` | Response | New Refresh ID after full rebuild |
+`New()` points the package-level logger to syslog (`LOG_LOCAL0`, JSON format) and falls back to stderr text output when syslog is unavailable.
 
 ***
 

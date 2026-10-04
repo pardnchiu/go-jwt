@@ -7,3 +7,4 @@ coverage.out
 .gomodcache/
 .tmp/
 .doc/version-generate/
+wiki-worker/

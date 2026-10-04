@@ -8,16 +8,16 @@
 </p>
 
 <p align="center">
-<a href="https://pkg.go.dev/github.com/pardnchiu/go-jwt"><img src="https://img.shields.io/badge/GO-REFERENCE-blue?include_prereleases&style=for-the-badge" alt="Go Reference"></a>
+<a href="https://pkg.go.dev/github.com/pardnchiu/go-jwt/core"><img src="https://img.shields.io/badge/GO-REFERENCE-blue?include_prereleases&style=for-the-badge" alt="Go Reference"></a>
 <a href="https://github.com/pardnchiu/go-jwt/releases"><img src="https://img.shields.io/github/v/tag/pardnchiu/go-jwt?include_prereleases&style=for-the-badge" alt="Release"></a>
 <a href="LICENSE"><img src="https://img.shields.io/github/license/pardnchiu/go-jwt?include_prereleases&style=for-the-badge" alt="License"></a>
 <a href="https://app.codecov.io/github/pardnchiu/go-jwt/tree/develop"><img src="https://img.shields.io/codecov/c/github/pardnchiu/go-jwt/develop?include_prereleases&style=for-the-badge" alt="Coverage"></a><br>
-<a href="https://github.com/avelino/awesome-go"><img src="https://awesome.re/mentioned-badge.svg" hight="40" alt="Coverage"></a>
+<a href="https://github.com/avelino/awesome-go"><img src="https://awesome.re/mentioned-badge.svg" height="40" alt="Mentioned in Awesome Go"></a>
 </p>
 
 ***
 
-> A Go JWT library with Redis lifecycle, device fingerprint binding, and dual middleware
+> A Go JWT library with Redis token lifecycle, device fingerprint binding, and lock-guarded transparent refresh
 
 ## Table of Contents
 
@@ -28,17 +28,13 @@
 
 ## Features
 
-> `go get github.com/pardnchiu/go-jwt` · [Documentation](./doc/doc.md)
+> `go get github.com/pardnchiu/go-jwt@latest` · import path `github.com/pardnchiu/go-jwt/core` · [Documentation](./doc/doc.md)
 
-```go
-import "github.com/pardnchiu/go-jwt/core"
-```
-
-- **Redis Token Lifecycle** — Manage create, verify, refresh, and revoke for Access Token and Refresh ID with Transaction Pipelines and distributed locks.
-- **Device Fingerprint Binding** — Bind tokens to OS, browser, and device ID via SHA-256 so stolen tokens fail on other devices.
-- **Dual-Framework Middleware** — Drop-in Gin and net/http middleware that verifies tokens and refreshes them transparently on expiry.
-- **ES256 with Auto PEM** — Sign with ECDSA P-256; load keys from path, inline PEM, or auto-generate a key pair on first run.
-- **Versioned Transparent Refresh** — Rebuild only the Access Token or fully rotate Refresh ID based on MaxVersion and TTL thresholds.
+- **Redis-Controlled Token Lifecycle** — An Access Token must pass both the ES256 signature and a Redis JTI whitelist, so logout writes a revocation record that takes effect immediately instead of waiting for JWT expiry.
+- **Device Fingerprint Binding** — A SHA-256 fingerprint of OS, browser, device type, and device ID binds both the Access Token and Refresh ID, so a stolen token fails on any other device.
+- **Lock-Guarded Transparent Refresh** — Expired tokens are re-signed from the Refresh ID automatically, and a `SETNX` lock with Lua compare-and-delete unlock ensures one refresh per Refresh ID across instances.
+- **Versioned Refresh ID Rotation** — The full token pair is reissued once refreshes exceed `MaxVersion` or the remaining TTL drops below a threshold; otherwise only the Access Token is re-signed to keep Redis writes low.
+- **ES256 Auto Keys with Dual Middleware** — Keys load from file paths or inline PEM, or a P-256 key pair is generated on first start, with drop-in Gin and `net/http` middleware.
 
 ## Architecture
 
@@ -46,13 +42,15 @@ import "github.com/pardnchiu/go-jwt/core"
 
 ```mermaid
 graph TB
-    REQ[HTTP Request] --> MW[Middleware]
+    REQ[HTTP Request] --> MW[Gin / net/http Middleware]
     MW --> V[Verify]
-    V -->|Valid| AUTH[Return Auth]
-    V -->|Expired| RF[Refresh]
-    V -->|No Token| DENY[Deny]
-    RF --> REDIS[(Redis)]
     V --> FP[Device Fingerprint]
+    V -->|Signature + JTI valid| OK[Return Auth]
+    V -->|Access Token expired or missing| RF[Refresh]
+    RF -->|Below threshold| RS[Re-sign Access Token]
+    RF -->|Over MaxVersion / TTL threshold| CR[Create full reissue]
+    V --> REDIS[(Redis)]
+    RF --> REDIS
 ```
 
 ## License
@@ -61,12 +59,11 @@ This project is licensed under the [MIT LICENSE](LICENSE).
 
 ## Author
 
-<img src="https://github.com/pardnchiu.png" align="left" width="96" height="96" style="margin-right: 0.5rem;">
+Just [open an issue](https://github.com/pardnchiu/go-jwt/issues/new) to share an idea.
 
-<h4 style="padding-top: 0">邱敬幃 Pardn Chiu</h4>
-
-<a href="mailto:hi@pardn.io">hi@pardn.io</a><br>
-<a href="https://www.linkedin.com/in/pardnchiu">https://www.linkedin.com/in/pardnchiu</a>
+<a href="https://github.com/pardnchiu/go-jwt/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=pardnchiu/go-jwt&cache_bust=2026-10-04" alt="go-jwt contributors" />
+</a>
 
 ***
 

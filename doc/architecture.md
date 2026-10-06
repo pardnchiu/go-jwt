@@ -1,5 +1,7 @@
 # go-jwt - Architecture
 
+Last updated: 2026-10-04
+
 > Back to [README](../README.md)
 
 ## Overview

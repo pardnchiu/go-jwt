@@ -1,3 +1,5 @@
+最後更新：2026-10-07
+
 > [!NOTE]
 > 此 README 由 [SKILL](https://github.com/agenvoy/skill-readme-generate) 生成，英文版請參閱 [這裡](../README.md)。
 
@@ -10,14 +12,13 @@
 <p align="center">
 <a href="https://pkg.go.dev/github.com/pardnchiu/go-jwt/core"><img src="https://img.shields.io/badge/GO-REFERENCE-blue?include_prereleases&style=for-the-badge" alt="Go Reference"></a>
 <a href="https://github.com/pardnchiu/go-jwt/releases"><img src="https://img.shields.io/github/v/tag/pardnchiu/go-jwt?include_prereleases&style=for-the-badge" alt="Release"></a>
-<a href="../LICENSE"><img src="https://img.shields.io/github/license/pardnchiu/go-jwt?include_prereleases&style=for-the-badge" alt="License"></a>
-<a href="https://app.codecov.io/github/pardnchiu/go-jwt/tree/develop"><img src="https://img.shields.io/codecov/c/github/pardnchiu/go-jwt/develop?include_prereleases&style=for-the-badge" alt="Coverage"></a><br>
+<a href="../LICENSE"><img src="https://img.shields.io/github/license/pardnchiu/go-jwt?include_prereleases&style=for-the-badge" alt="License"></a><br>
 <a href="https://github.com/avelino/awesome-go"><img src="https://awesome.re/mentioned-badge.svg" height="40" alt="Mentioned in Awesome Go"></a>
 </p>
 
 ***
 
-> Go JWT 函式庫，具備 Redis Token 生命週期、裝置指紋綁定與分散鎖透明刷新
+> Go JWT 驗證函式庫，具備刷新令牌輪替、Redis 撤銷與 Gin 中介層
 
 ## 目錄
 
@@ -62,7 +63,7 @@ graph TB
 Just [open an issue](https://github.com/pardnchiu/go-jwt/issues/new) to share an idea.
 
 <a href="https://github.com/pardnchiu/go-jwt/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=pardnchiu/go-jwt&cache_bust=2026-10-04" alt="go-jwt contributors" />
+  <img src="https://contrib.rocks/image?repo=pardnchiu/go-jwt&cache_bust=2026-10-07" alt="go-jwt contributors" />
 </a>
 
 ***

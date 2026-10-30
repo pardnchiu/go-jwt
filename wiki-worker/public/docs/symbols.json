@@ -1,0 +1,77 @@
+[
+  {
+    "package": "core",
+    "name": "Auth",
+    "kind": "type"
+  },
+  {
+    "package": "core",
+    "name": "GetAuthDataFromGinContext",
+    "kind": "func"
+  },
+  {
+    "package": "core",
+    "name": "GetAuthDataFromHTTPRequest",
+    "kind": "func"
+  },
+  {
+    "package": "core",
+    "name": "Config",
+    "kind": "type"
+  },
+  {
+    "package": "core",
+    "name": "Cookie",
+    "kind": "type"
+  },
+  {
+    "package": "core",
+    "name": "File",
+    "kind": "type"
+  },
+  {
+    "package": "core",
+    "name": "JWTAuth",
+    "kind": "type"
+  },
+  {
+    "package": "core",
+    "name": "New",
+    "kind": "func"
+  },
+  {
+    "package": "core",
+    "name": "JWTAuthResult",
+    "kind": "type"
+  },
+  {
+    "package": "core",
+    "name": "Option",
+    "kind": "type"
+  },
+  {
+    "package": "core",
+    "name": "Pem",
+    "kind": "type"
+  },
+  {
+    "package": "core",
+    "name": "Redis",
+    "kind": "type"
+  },
+  {
+    "package": "core",
+    "name": "RefreshData",
+    "kind": "type"
+  },
+  {
+    "package": "core",
+    "name": "RefreshId",
+    "kind": "type"
+  },
+  {
+    "package": "core",
+    "name": "TokenResult",
+    "kind": "type"
+  }
+]

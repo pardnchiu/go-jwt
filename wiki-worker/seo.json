@@ -1,0 +1,123 @@
+{
+  "home_title": {
+    "en": "Go JWT Authentication with Refresh Tokens | go-jwt",
+    "zh": "JWT Token 驗證｜go-jwt"
+  },
+  "descriptions": {
+    "en": {
+      "home": "Go JWT authentication library: ES256 JWT tokens, Redis-backed refresh token rotation and revocation, device binding, Gin middleware. By 邱敬幃 Pardn Chiu.",
+      "getting-started": "Install go-jwt, start Redis, and run a net/http server that logs in, verifies, and logs out with ES256 JWTs in a few minutes.",
+      "architecture": "One diagram of go-jwt layers: middleware, Create/Verify/refresh/Revoke, fingerprinting, cookies, PEM keys, and Redis state.",
+      "core-concepts": "How go-jwt uses an ES256 Access Token, a SHA-256 Refresh ID, and a Redis JTI whitelist, including JWT claims and RefreshData fields.",
+      "verification": "The nine checks Verify runs in order: revocation, signature, nbf/iat, Refresh ID and fingerprint binding, JTI whitelist, with failure codes.",
+      "refresh": "How expired JWTs refresh transparently: Redis lock, CheckAuth, re-sign versus full refresh token rotation by MaxVersion and TTL, and 429 handling.",
+      "revocation": "How Revoke logs out: cleared cookies, Redis revoke record for the Access Token, a 5-second Refresh ID grace window, and edge cases.",
+      "device-fingerprint": "How go-jwt derives a SHA-256 device fingerprint from User-Agent and device ID, why curl needs X-Device-FP, and binding trade-offs.",
+      "middleware": "Gin and net/http JWT middleware: failure responses, reading Auth from context, the \"user\" context key, and scope checks.",
+      "client-integration": "Cookies and headers go-jwt reads and sets, plus browser, mobile, and API client setup including full-reissue cookies and 429 retries.",
+      "configuration": "Config, Redis, Option, and Cookie fields with defaults: token lifetimes, cookie names, MaxVersion, RefreshTTL, and syslog logging.",
+      "key-management": "ES256 key loading order, PKCS#8/PKIX format, P-256 requirement, OpenSSL commands, shared keys across instances, and rotation.",
+      "api-reference": "Every exported go-jwt/core function, JWTAuth method, and type: New, Create, Verify, Revoke, middleware, JWTAuthResult, Auth.",
+      "error-codes": "Every JWTAuthResult StatusCode and ErrorTag pair (400, 401, 429, 500) with its trigger, plus how to branch on tags.",
+      "redis-keys": "The four Redis keys go-jwt writes (refresh, jti, lock, revoke), their TTLs, per-operation reads and writes, and the unlock script.",
+      "removed-api": "Symbols removed from go-jwt by version, from v0.4.0 to the v1.0.3 move to the core subpackage, with replacements."
+    },
+    "zh": {
+      "home": "Go JWT Token 驗證函式庫：Redis 管理 ES256 JWT 與 Refresh Token 輪替、撤銷、裝置綁定及 Gin 中介層，作者邱敬幃。",
+      "getting-started": "安裝 go-jwt、啟動 Redis，幾分鐘內跑起以 ES256 JWT 登入、驗證與登出的 net/http 伺服器。",
+      "architecture": "一張圖看懂 go-jwt 分層：中介層、Create／Verify／刷新／Revoke、裝置指紋、Cookie、金鑰與 Redis。",
+      "core-concepts": "go-jwt 如何組合 ES256 Access Token、SHA-256 Refresh ID 與 Redis JTI 白名單，以及 JWT claims。",
+      "verification": "Verify 依序執行的九項檢查：撤銷、簽章、nbf／iat、Refresh ID 與指紋綁定、JTI 白名單，以及各自的錯誤碼。",
+      "refresh": "JWT 過期如何透明刷新：Redis 鎖、CheckAuth、依 MaxVersion 與 TTL 決定重簽或 Refresh Token 輪替。",
+      "revocation": "Revoke 如何登出：清除 Cookie、寫入 Access Token 撤銷紀錄、Refresh ID 5 秒緩衝期與邊界情境。",
+      "device-fingerprint": "go-jwt 如何由 User-Agent 與裝置 ID 算出 SHA-256 指紋、curl 為何需要 X-Device-FP，以及綁定強度取捨。",
+      "middleware": "Gin 與 net/http 的 JWT 中介層：失敗回應、從 context 取出 Auth、\"user\" context key 與 scope 授權。",
+      "client-integration": "go-jwt 讀寫的 Cookie 與 header，以及瀏覽器、行動 App、API 客戶端的串接方式與 429 重送。",
+      "configuration": "Config、Redis、Option、Cookie 欄位與預設值：Token 有效期、Cookie 名稱、MaxVersion、RefreshTTL。",
+      "key-management": "ES256 金鑰載入順序、PKCS#8／PKIX 格式、P-256 限制、OpenSSL 指令、多實例共用金鑰與輪替。",
+      "api-reference": "go-jwt/core 所有匯出函式、方法與型別：New、Create、Verify、Revoke、中介層、JWTAuthResult。",
+      "error-codes": "JWTAuthResult 每組 StatusCode 與 ErrorTag（400、401、429、500）的觸發情境，以及依標籤分流的寫法。",
+      "redis-keys": "go-jwt 寫入的四種 Redis key（refresh、jti、lock、revoke）、TTL、各操作的讀寫與解鎖腳本。",
+      "removed-api": "go-jwt 歷次移除的符號，從 v0.4.0 到 v1.0.3 移至 core 子套件，附移除版本與替代做法。"
+    }
+  },
+  "keywords": {
+    "en": {
+      "home": "Go JWT authentication, JWT token, refresh token rotation, go-jwt, ES256 JWT Go, JWT Redis, Gin JWT middleware",
+      "getting-started": "go-jwt install, Go JWT tutorial, go get go-jwt, JWT login example, Redis JWT",
+      "architecture": "go-jwt architecture, JWT Redis design, token lifecycle",
+      "core-concepts": "access token, refresh ID, JTI whitelist, JWT claims, RefreshData",
+      "verification": "JWT verification, JTI whitelist, token revocation check, nbf iat",
+      "refresh": "refresh token rotation, transparent JWT refresh, Redis lock, MaxVersion, CheckAuth",
+      "revocation": "JWT logout, token revocation, Redis revoke list",
+      "device-fingerprint": "device fingerprint binding, JWT device binding, X-Device-FP, User-Agent fingerprint",
+      "middleware": "Gin JWT middleware, net/http JWT middleware, Go auth middleware",
+      "client-integration": "JWT cookies, Authorization Bearer, X-Refresh-ID, mobile JWT client, 429 retry",
+      "configuration": "go-jwt config, JWT expiry, cookie options, SameSite, Redis config",
+      "key-management": "ES256 key, ECDSA P-256 PEM, PKCS8, openssl ecparam, JWT key rotation",
+      "api-reference": "go-jwt API, goJwt New, JWTAuth, JWTAuthResult, Auth struct",
+      "error-codes": "JWT error codes, ErrorTag, 401 unauthorized, 429 refresh",
+      "redis-keys": "Redis keys, JWT Redis TTL, refresh key, jti key",
+      "removed-api": "go-jwt migration, go-jwt core import path, removed API, upgrade"
+    },
+    "zh": {
+      "home": "JWT Token, Refresh Token, Go JWT 驗證, go-jwt, ES256 JWT, JWT 裝置綁定, Gin JWT 中介層",
+      "getting-started": "go-jwt 安裝, Go JWT 教學, JWT 登入範例, Redis JWT",
+      "architecture": "go-jwt 架構, JWT Redis 設計, Token 生命週期",
+      "core-concepts": "Access Token, Refresh ID, JTI 白名單, JWT claims",
+      "verification": "JWT 驗證, JTI 白名單, Token 撤銷檢查",
+      "refresh": "Refresh Token, Refresh Token 輪替, JWT 透明刷新, Redis 鎖, MaxVersion",
+      "revocation": "JWT 登出, Token 撤銷, Redis 撤銷紀錄",
+      "device-fingerprint": "JWT 裝置綁定, 裝置指紋, X-Device-FP, User-Agent",
+      "middleware": "Gin JWT 中介層, net/http 中介層, Go 驗證中介層",
+      "client-integration": "JWT Cookie, Authorization Bearer, X-Refresh-ID, 行動 App JWT",
+      "configuration": "go-jwt 設定, JWT 有效期, Cookie 設定, SameSite",
+      "key-management": "ES256 金鑰, ECDSA P-256, PKCS8, openssl, 金鑰輪替",
+      "api-reference": "go-jwt API, JWTAuth, JWTAuthResult, Auth",
+      "error-codes": "JWT 錯誤碼, ErrorTag, 401, 429",
+      "redis-keys": "Redis key, JWT Redis TTL, refresh key, jti",
+      "removed-api": "go-jwt 升級, core 匯入路徑, 已移除 API"
+    }
+  },
+  "brand_keywords": [
+    "邱敬幃",
+    "Pardn Chiu",
+    "pardnchiu"
+  ],
+  "person": {
+    "id": "https://pardn.io/#pardnchiu",
+    "name": "Pardn Chiu",
+    "alt_names": [
+      "邱敬幃",
+      "Chiu Ching-Wei",
+      "pardnchiu"
+    ],
+    "same_as": [
+      "https://pardn.io/",
+      "https://www.linkedin.com/in/pardnchiu",
+      "https://github.com/pardnchiu",
+      "https://dev.to/pardnchiu",
+      "https://x.com/pardnchiu"
+    ]
+  },
+  "organization": {
+    "id": "https://pardn.io/#organization",
+    "url": "https://pardn.io/",
+    "name": "Pardn Co., Ltd",
+    "name_zh": "帕登國際有限公司",
+    "same_as": [
+      "https://github.com/pardnio"
+    ]
+  },
+  "tagline": "Taiwan · Infrastructure Engineering",
+  "og_image": "https://github.com/pardnchiu.png",
+  "favicon": "/favicon.png",
+  "x_default": "",
+  "ai_usage": {
+    "train": "y",
+    "input": "y",
+    "search": "y"
+  },
+  "programming_language": "Go",
+  "license_url": "https://opensource.org/licenses/MIT"
+}
